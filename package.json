@@ -1,0 +1,52 @@
+{
+  "name": "mzazi-tech-quartz-bot",
+  "version": "3.0.0",
+  "description": "MZAZI TECH QUARTZ BOT - Premium Telegram x WhatsApp Bot with Subscription System",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "start:full": "npx prisma generate && npx prisma db push && node index.js",
+    "test": "node test.js",
+    "db:generate": "npx prisma generate",
+    "db:push": "npx prisma db push",
+    "db:migrate": "npx prisma migrate deploy",
+    "db:studio": "npx prisma studio",
+    "postinstall": "npx prisma generate"
+  },
+  "overrides": {
+    "form-data": "^4.0.0"
+  },
+  "keywords": [    "mzazi-tech-quartz", "nachety", "prime", "telegram", "whatsapp", "bot", "premium", "paystack"],
+  "author": "Nachety Dev",
+  "license": "ISC",
+  "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
+    "@prisma/client": "^5.16.2",
+    "@whiskeysockets/baileys": "npm:@ostyado/baileys@2.0.5",
+    "axios": "^1.6.7",
+    "canvas": "^3.1.2",
+    "chalk": "^4.1.2",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "file-type": "^19.0.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "form-data": "^4.0.0",
+    "gifted-btns": "^1.0.2",
+    "google-tts-api": "^2.0.2",
+    "libsignal": "^6.0.0",
+    "moment-timezone": "^0.5.45",
+    "node-cache": "^5.1.2",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^2.6.9",
+    "node-telegram-bot-api": "^0.66.0",
+    "node-webpmux": "^3.1.1",
+    "path": "^0.12.7",
+    "pino": "^9.6.0",
+    "prisma": "^5.16.2",
+    "translatte": "^3.0.1",
+    "yt-search": "^2.13.1",
+    "ytdl-core": "^4.11.5"
+  },
+  "devDependencies": {}
+}

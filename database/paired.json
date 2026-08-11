@@ -1,0 +1,32 @@
+[
+  {
+    "number": "254112896604",
+    "userId": "8271689545",
+    "active": true,
+    "createdAt": 1786343765463
+  },
+  {
+    "number": "254739869340",
+    "userId": "8271689545",
+    "active": false,
+    "createdAt": 1786347535060
+  },
+  {
+    "number": "254741388986",
+    "userId": 6454759976,
+    "active": false,
+    "createdAt": 1786351319546
+  },
+  {
+    "number": "254702895880",
+    "userId": "8271689545",
+    "active": true,
+    "createdAt": 1786367432219
+  },
+  {
+    "number": "254753405751",
+    "userId": 8890061927,
+    "active": false,
+    "createdAt": 1786489106080
+  }
+]

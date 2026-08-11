@@ -1,0 +1,109 @@
+// Neon PostgreSQL schema for MZAZI TECH QUARTZ BOT subscription system
+// Managed via Prisma ORM
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+model User {
+  id         Int      @id @default(autoincrement())
+  telegramId BigInt   @unique
+  username   String?
+  firstName  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  subscription  Subscription?
+  sessions      WhatsAppSession[]
+  payments      Payment[]
+  transactions  Transaction[]
+  logs          Log[]
+}
+
+// ─── Subscriptions ───────────────────────────────────────────────────────────
+// plan: FREE | PLAN_5 | PLAN_10 | PLAN_20 | UNLIMITED
+// status: ACTIVE | EXPIRED
+model Subscription {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @unique
+  user       User     @relation(fields: [userId], references: [id])
+  plan       String   @default("FREE")
+  maxDevices Int      @default(1)
+  startDate  DateTime?
+  endDate    DateTime?
+  status     String   @default("ACTIVE")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─── WhatsApp Sessions ───────────────────────────────────────────────────────
+// status: ACTIVE | INACTIVE | DELETED
+model WhatsAppSession {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  phoneNumber String   @unique
+  status      String   @default("ACTIVE")
+  connectedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+// status: PENDING | SUCCESS | FAILED
+model Payment {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  reference   String   @unique
+  amount      Float
+  plan        String
+  status      String   @default("PENDING")
+  paystackRef String?
+  couponUsed  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Transactions ────────────────────────────────────────────────────────────
+// type: PAYMENT | UPGRADE | DOWNGRADE | REFUND | COUPON
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  type        String
+  amount      Float    @default(0)
+  description String
+  createdAt   DateTime @default(now())
+}
+
+// ─── Coupons ─────────────────────────────────────────────────────────────────
+model Coupon {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique
+  discount  Float     @default(0)    // percentage 0–100
+  maxUses   Int       @default(1)
+  usesCount Int       @default(0)
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+}
+
+// ─── Logs ────────────────────────────────────────────────────────────────────
+// level: INFO | WARN | ERROR
+model Log {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  details   String?
+  level     String   @default("INFO")
+  createdAt DateTime @default(now())
+}
