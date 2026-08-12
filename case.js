@@ -2606,6 +2606,23 @@ const mzazireply = async (text, options = {}) => {
         }
         return;
       }
+
+      // Nothing matched. If the registry never loaded, say so (in DMs) instead
+      // of staying silent — this surfaces sync/key problems immediately.
+      const regStatus = getRemoteStatus();
+      if (regStatus.count === 0) {
+        const why = !regStatus.keyConfigured
+          ? "BOT_API_KEY is not set in .env (it must match the website's BOT_API_KEY)"
+          : regStatus.lastError
+            ? `sync failed: ${regStatus.lastError}`
+            : "registry is empty";
+        logSystem(`Command "${command}" ignored — no commands loaded (${why})`, "warn");
+        if (!isGroup) {
+          return mzazireply(
+            `⚠️ Commands are not loaded yet.\n\nReason: ${why}\n\nRun .synccmd to retry the sync.`
+          );
+        }
+      }
     }
 
   } catch (error) {
