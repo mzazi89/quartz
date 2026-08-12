@@ -342,6 +342,10 @@ function setupBotHandlers(bot, botIndex) {
   const gate = require('./lib/telegramGate')(bot);
   const _processUpdate = bot.processUpdate.bind(bot);
   bot.processUpdate = async (update) => {
+    // join/leave events → record the member in the ledger JSON
+    if (update.chat_member || update.my_chat_member) {
+      gate.handleChatMember(update);
+    }
     const msg = update.message;
     if (msg && msg.from) {
       gate.captureGroup(msg);
@@ -362,12 +366,9 @@ function setupBotHandlers(bot, botIndex) {
     return _processUpdate(update);
   };
 
-  // ─── /start ──────────────────────────────────────────────────────────────
-  bot.onText(/\/start/, async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-
-    await getOrCreateUser(userId, msg.from.username, msg.from.first_name);
+  // ─── /start (also reused after the membership gate unlocks) ───────────────
+  async function sendStartMenu(chatId, userId, username, firstName) {
+    await getOrCreateUser(userId, username, firstName);
 
     const welcomeText = `
 <b>Welcome to MZAZI TECH QUARTZ BOT</b>
@@ -399,6 +400,10 @@ For support, use the main menu or contact the owner.
     } catch (error) {
       bot.sendMessage(chatId, welcomeText, { parse_mode: 'HTML', ...mainKeyboard });
     }
+  }
+
+  bot.onText(/\/start/, async (msg) => {
+    await sendStartMenu(msg.chat.id, msg.from.id, msg.from.username, msg.from.first_name);
   });
 
   // ─── Message handler ─────────────────────────────────────────────────────
@@ -579,9 +584,14 @@ Press <b>Upgrade Plan</b> to subscribe.
     // ─── Membership gate: "✅ I've Joined" re-check ──────────────────────────
     if (data === 'gate:check') {
       const passed = await gate.handleGateCheck(chatId, userId, query.message.message_id);
-      return bot.answerCallbackQuery(query.id, {
+      bot.answerCallbackQuery(query.id, {
         text: passed ? '✅ Verified! You can now use the bot.' : '❌ Join all groups, then tap again.',
       }).catch(() => {});
+      if (passed) {
+        // unlocked → continue straight into the bot menu
+        await sendStartMenu(chatId, userId, query.from.username, query.from.first_name);
+      }
+      return;
     }
 
     bot.answerCallbackQuery(query.id).catch(() => {});
@@ -1119,6 +1129,25 @@ Valid for 1 hour.
     bot.sendMessage(
       chatId,
       `<b>📡 Captured groups</b>\n${seenLines}\n\n<b>🔒 Required for the gate</b>\n${reqLines}`,
+      { parse_mode: 'HTML' }
+    );
+  });
+
+  // ─── /setgroup (owner) — configure the private group's numeric chat ID ─────
+  bot.onText(/\/setgroup (.+)/, async (msg, match) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
+
+    const r = gate.setPrivateGroupId(match[1].trim());
+    if (!r.ok) return bot.sendMessage(chatId, `❌ ${r.error}`);
+
+    const lines = r.required
+      .map((g) => `• ${g.title}: <code>${g.id || '(not configured)'}</code>`)
+      .join('\n');
+    bot.sendMessage(
+      chatId,
+      `✅ Private group ID saved.\n\n<b>🔒 Required groups now:</b>\n${lines}`,
       { parse_mode: 'HTML' }
     );
   });
