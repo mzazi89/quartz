@@ -167,17 +167,15 @@ async function handleMyDevices(bot, chatId, userId) {
   if (sessions.length === 0) {
     return bot.sendMessage(
       chatId,
-      '📭 <b>No devices paired yet!</b>\n\nUse /pair [number] to pair your first WhatsApp device.',
+      '📭 <b>No devices paired yet.</b>\n\nUse /pair [number] to pair your first device.',
       { parse_mode: 'HTML' }
     );
   }
 
   let text = `
-╔══════════════════════════╗
-║       📲  MY DEVICES  📲      ║
-╚══════════════════════════╝
+<b>📲 My Devices</b>
 
-<b>Slots used:</b> ${deviceCount} / ${maxDevices === 999 ? '∞' : maxDevices}
+Slots: ${deviceCount} / ${maxDevices === 999 ? '∞' : maxDevices}
 
 `.trim() + '\n\n';
 
@@ -222,18 +220,14 @@ async function handleSubscriptionMenu(bot, chatId, userId) {
   const remaining = maxDevices === 999 ? '∞' : Math.max(0, maxDevices - deviceCount);
 
   const subText = `
-╔══════════════════════════╗
-║      💳  SUBSCRIPTION  💳     ║
-╚══════════════════════════╝
+<b>💳 Subscription</b>
 
-📦 <b>Current Plan:</b> ${planName}
-📅 <b>Expiry Date:</b> ${expiryText}
-📱 <b>Connected Devices:</b> ${deviceCount}
-🔓 <b>Remaining Slots:</b> ${remaining}
-📊 <b>Max Devices:</b> ${maxDevices === 999 ? 'Unlimited' : maxDevices}
+📦 Plan: ${planName}
+📅 Expires: ${expiryText}
+📱 Devices: ${deviceCount} / ${maxDevices === 999 ? 'Unlimited' : maxDevices}
+🔓 Slots left: ${remaining}
 
-${isExpired ? '⚠️ <b>Your subscription has expired. Upgrade to restore access.</b>' : ''}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${isExpired ? '⚠️ Your subscription has expired. Upgrade to continue.' : ''}
   `.trim();
 
   bot.sendMessage(chatId, subText, {
@@ -252,21 +246,14 @@ async function sendAdminPanel(bot, chatId) {
   const s = stats || {};
 
   const panelText = `
-╔══════════════════════════╗
-║       ⚙️  ADMIN PANEL  ⚙️      ║
-╚══════════════════════════╝
+<b>⚙️ Admin Panel</b>
 
-━━━━━━ LIVE STATS ━━━━━━━━━
-
-👤 Total Users     : ${s.totalUsers || 0}
-💎 Active Subs     : ${s.activeSubs || 0}
-⏳ Expired Subs    : ${s.expiredSubs || 0}
-📱 Active Sessions : ${s.activeSessions || 0}
-💳 Total Payments  : ${s.totalPayments || 0}
-✅ Success Payments: ${s.successPayments || 0}
-💰 Total Revenue   : KES ${s.totalRevenue || 0}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 Users: ${s.totalUsers || 0}
+💎 Active subs: ${s.activeSubs || 0}
+⏳ Expired subs: ${s.expiredSubs || 0}
+📱 Active sessions: ${s.activeSessions || 0}
+💳 Payments: ${s.totalPayments || 0} (${s.successPayments || 0} success)
+💰 Revenue: KES ${s.totalRevenue || 0}
   `.trim();
 
   bot.sendMessage(chatId, panelText, {
@@ -302,7 +289,7 @@ async function handleVerifyPayment(bot, chatId, userId, reference) {
 
   if (!result.success) {
     if (result.alreadyProcessed) {
-      return bot.sendMessage(chatId, '✅ Payment already verified and subscription is active!');
+      return bot.sendMessage(chatId, '✅ Payment already verified. Your subscription is active.');
     }
     return bot.sendMessage(
       chatId,
@@ -314,13 +301,13 @@ async function handleVerifyPayment(bot, chatId, userId, reference) {
   const { PLANS } = require('./lib/payment');
   const plan = PLANS[result.planKey];
   const successMsg = `
-✅ <b>Payment Verified!</b>
+✅ <b>Payment verified.</b>
 
-📦 Plan: <b>${plan?.name || result.planKey}</b>
-📱 Devices: <b>${plan?.maxDevices === 999 ? 'Unlimited' : plan?.maxDevices}</b>
-⏳ Valid for: <b>30 Days</b>
+📦 Plan: ${plan?.name || result.planKey}
+📱 Devices: ${plan?.maxDevices === 999 ? 'Unlimited' : plan?.maxDevices}
+⏳ Valid: 30 days
 
-Tap <b>📱 Pair Device</b> to add your WhatsApp numbers!
+Use <b>📱 Pair Device</b> to add your WhatsApp numbers.
   `.trim();
 
   bot.sendMessage(chatId, successMsg, { parse_mode: 'HTML' });
@@ -340,33 +327,18 @@ function setupBotHandlers(bot, botIndex) {
     await getOrCreateUser(userId, msg.from.username, msg.from.first_name);
 
     const welcomeText = `
-╔═══════════════════════╗
-║ MZAZI TECH QUARTZ BOT ║
-╚═══════════════════════╝
+<b>Welcome to MZAZI TECH QUARTZ BOT</b>
 
-> SYSTEM STATUS: ONLINE
-> SECURITY: ACTIVE
-> CORE VERSION: 3.0.0
-> BOT: ${botIndex + 1}/${bots.length}
+A secure WhatsApp automation and device management service.
 
-[ USER INTERFACE INITIALIZED ]
+<b>Quick start</b>
+/pair [number] — Pair a WhatsApp device
+/mydevices — Manage your devices
+/subscription — Subscription and plans
+/myid — Your profile
+/help — All commands
 
-MZAZI TECH QUARTZ BOT is a next-gen WhatsApp
-automation engine built for speed,
-control and power.
-
-───── COMMAND CORE ────────
-
-⚡ /pair [number]   — Pair device
-⚡ /delpair [number] — Delete pair
-⚡ /listsessions    — Your sessions
-⚡ /subscription   — Subscription info
-⚡ /mydevices       — Manage devices
-⚡ /myid            — Your profile
-⚡ /help            — Commands
-
-───────────────────────────
-MZAZI TECH QUARTZ BOT © 2026 | Mzazi Systems Online
+For support, use the main menu or contact the owner.
   `.trim();
 
     try {
@@ -413,7 +385,7 @@ MZAZI TECH QUARTZ BOT © 2026 | Mzazi Systems Online
       if (settings.premiumOnly && !isOwner(userId)) {
         const { sub } = await getSubStatus(userId);
         if (sub.plan === 'FREE') {
-          return bot.sendMessage(chatId, '❌ Pairing is currently available for premium users only!');
+          return bot.sendMessage(chatId, '❌ Pairing is available to premium users only.');
         }
       }
       return bot.sendMessage(
@@ -453,28 +425,15 @@ MZAZI TECH QUARTZ BOT © 2026 | Mzazi Systems Online
         : 'Never';
 
       const infoText = `
-╔═════════════════════════╗
-║ 🧬 MZAZI TECH QUARTZ ID ║
-╚═════════════════════════╝
+<b>👤 Your Profile</b>
 
-> ACCESSING USER DATABASE...
-> DATA RETRIEVED SUCCESSFULLY ✓
-
-━━━━━━ USER PROFILE ━━━━━━━
-
-🆔 ID        : <code>${userId}</code>
-👤 Username  : @${username}
-📛 Name      : ${firstName}
-
-━━━ SUBSCRIPTION STATUS ━━━━━
-
-📦 Plan      : ${effectivePlan.replace('_', ' ')}
-📱 Devices   : ${deviceCount} / ${maxDevices === 999 ? '∞' : maxDevices}
-📅 Expires   : ${expiryText}
-👑 Owner     : ${isOwner(userId) ? 'AUTHORIZED ✓' : 'Standard User'}
-
-━━━━━━━━━━━━━━━━━━━━━━
-MZAZI TECH QUARTZ BOT Security Layer • v3.0.0`.trim();
+🆔 ID: <code>${userId}</code>
+👤 Username: @${username}
+📛 Name: ${firstName}
+📦 Plan: ${effectivePlan.replace('_', ' ')}
+📱 Devices: ${deviceCount} / ${maxDevices === 999 ? '∞' : maxDevices}
+📅 Expires: ${expiryText}
+👑 Role: ${isOwner(userId) ? 'Owner' : 'User'}`.trim();
 
       bot.sendMessage(chatId, infoText, { parse_mode: 'HTML' });
     }
@@ -482,33 +441,17 @@ MZAZI TECH QUARTZ BOT Security Layer • v3.0.0`.trim();
     // ─── 💎 Plans & Pricing ──────────────────────────────────────────────────
     else if (text === '💎 Plans & Pricing') {
       const planText = `
-╔══════════════════════════╗
-║      💎  PLANS & PRICING  💎    ║
-╚══════════════════════════╝
+<b>💎 Plans & Pricing</b>
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🆓 <b>Free</b> — 1 number, basic features
+📦 <b>5 numbers</b> — KES 100 / 30 days
+📦 <b>10 numbers</b> — KES 150 / 30 days
+📦 <b>20 numbers</b> — KES 200 / 30 days
+🔥 <b>Unlimited</b> — KES 250 / 30 days
 
-🆓 <b>FREE PLAN</b>
-   • 1 WhatsApp Number
-   • Basic features
-   • No cost
+All paid plans include priority support, all features, auto-reconnect, and 30-day validity.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📦 <b>5 NUMBERS</b> — <code>KES 100 / 30 Days</code>
-📦 <b>10 NUMBERS</b> — <code>KES 150 / 30 Days</code>
-📦 <b>20 NUMBERS</b> — <code>KES 200 / 30 Days</code>
-🔥 <b>UNLIMITED</b> — <code>KES 250 / 30 Days</code>
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-All paid plans include:
-✅ Priority support
-✅ All bot features
-✅ Auto-reconnect
-✅ 30-day validity
-
-Tap <b>Upgrade Plan</b> below to subscribe.
+Press <b>Upgrade Plan</b> to subscribe.
     `.trim();
 
       bot.sendMessage(chatId, planText, {
@@ -524,7 +467,7 @@ Tap <b>Upgrade Plan</b> below to subscribe.
     // ─── ⚙️ Owner Menu ────────────────────────────────────────────────────────
     else if (text === '⚙️ Owner Menu') {
       if (!isOwner(userId)) {
-        return bot.sendMessage(chatId, '❌ This menu is owner only!');
+        return bot.sendMessage(chatId, '❌ Owner only.');
       }
       await sendAdminPanel(bot, chatId);
     }
@@ -532,34 +475,31 @@ Tap <b>Upgrade Plan</b> below to subscribe.
     // ─── 📋 Help ──────────────────────────────────────────────────────────────
     else if (text === '📋 Help') {
       const helpText = `
-╔══════════════════════════╗
-║       📋 COMMAND LIST        ║
-╚══════════════════════════╝
+<b>📋 Commands</b>
 
-<b>General:</b>
-/start — Start bot
+<b>General</b>
+/start — Main menu
 /myid — Your profile
 /help — This message
 
-<b>Pairing:</b>
-/pair [number] — Pair device
-/delpair [number] — Delete pair
+<b>Pairing</b>
+/pair [number] — Pair a device
+/delpair [number] — Remove a device
 /listsessions — Your sessions
 /mydevices — Manage devices
 
-<b>Subscription:</b>
-/subscription — Subscription info
-/verify [ref] — Verify payment manually
+<b>Subscription</b>
+/subscription — Plan and status
+/verify [ref] — Verify a payment
 
-<b>Owner Only:</b>
+<b>Owner only</b>
 /admin — Admin panel
-/addprem [id] — Quick premium upgrade
-/delprem [id] — Remove premium
-/premium on/off — Toggle premium-only mode
+/addprem [id] — Grant premium
+/delprem [id] — Revoke premium
+/premium on|off — Toggle premium-only mode
 /listpaired — All sessions
-/broadcast [msg] — Broadcast message
-
-══════════════════════════`.trim();
+/broadcast [msg] — Send a broadcast
+    `.trim();
 
       bot.sendMessage(chatId, helpText, { parse_mode: 'HTML' });
     }
@@ -634,19 +574,15 @@ Tap <b>Upgrade Plan</b> below to subscribe.
       }
 
       const payText = `
-╔══════════════════════════╗
-║    💳  PAYMENT INITIATED  💳    ║
-╚══════════════════════════╝
+<b>💳 Payment</b>
 
-📦 <b>Plan:</b> ${plan.name}
-💰 <b>Amount:</b> KES ${plan.price}
-⏳ <b>Validity:</b> 30 Days
-🔖 <b>Reference:</b> <code>${result.reference}</code>
+📦 Plan: ${plan.name}
+💰 Amount: KES ${plan.price}
+🔖 Reference: <code>${result.reference}</code>
 
-Click <b>Pay Now</b> to complete your payment.
-After payment, your subscription activates automatically.
+Press <b>Pay Now</b> to complete payment. Your subscription activates automatically.
 
-To verify manually: <code>/verify ${result.reference}</code>
+Manual check: /verify ${result.reference}
     `.trim();
 
       bot.sendMessage(chatId, payText, {
@@ -698,7 +634,7 @@ To verify manually: <code>/verify ${result.reference}</code>
         let sessions = loadJSON('./database/paired.json', []);
         const idx = sessions.findIndex(s => s.number === phoneNumber && (String(s.userId) === String(userId) || isOwner(userId)));
         if (idx === -1) {
-          return bot.sendMessage(chatId, '❌ Session not found!');
+          return bot.sendMessage(chatId, '❌ Session not found.');
         }
         sessions[idx].active = false;
         saveJSON('./database/paired.json', sessions);
@@ -719,7 +655,7 @@ To verify manually: <code>/verify ${result.reference}</code>
         let sessions = loadJSON('./database/paired.json', []);
         const idx = sessions.findIndex(s => s.number === phoneNumber && (String(s.userId) === String(userId) || isOwner(userId)));
         if (idx === -1) {
-          return bot.sendMessage(chatId, '❌ Session not found or no permission!');
+          return bot.sendMessage(chatId, '❌ Session not found or no permission.');
         }
 
         const sessionPath = `./database/sessions/${phoneNumber}`;
@@ -744,7 +680,7 @@ To verify manually: <code>/verify ${result.reference}</code>
 
     // ─── Admin panel actions ───────────────────────────────────────────────────
     if (data.startsWith('admin:') && !isOwner(userId)) {
-      return bot.sendMessage(chatId, '❌ Admin only!');
+      return bot.sendMessage(chatId, '❌ Admin only.');
     }
 
     if (data === 'admin:stats') {
@@ -920,13 +856,13 @@ To verify manually: <code>/verify ${result.reference}</code>
     if (settings.premiumOnly && !isOwner(userId)) {
       const { effectivePlan } = await getSubStatus(userId);
       if (effectivePlan === 'FREE') {
-        return bot.sendMessage(chatId, '❌ Pairing is currently available for premium users only!');
+        return bot.sendMessage(chatId, '❌ Pairing is available to premium users only.');
       }
     }
 
     const validNumber = validatePhoneNumber(phoneNumber);
     if (!validNumber) {
-      return bot.sendMessage(chatId, '❌ Invalid phone number!\n\n<b>Usage:</b> /pair 254785016388', {
+      return bot.sendMessage(chatId, '❌ Invalid phone number.\n\n<b>Usage:</b> /pair 254785016388', {
         parse_mode: 'HTML',
       });
     }
@@ -934,7 +870,7 @@ To verify manually: <code>/verify ${result.reference}</code>
     const currentSessions = loadJSON('./database/paired.json', []);
     const existingSession = currentSessions.find(s => s.number === validNumber);
     if (existingSession) {
-      return bot.sendMessage(chatId, '⚠️ This number is already paired!');
+      return bot.sendMessage(chatId, '⚠️ This number is already paired.');
     }
 
     await getOrCreateUser(userId, msg.from.username, msg.from.first_name);
@@ -969,17 +905,13 @@ Upgrade your subscription to connect more devices.
         pairingCodes.set(formattedCode, { count: 0, phoneNumber: validNumber, userId });
 
         const text = `
-╔═══════════════════════╗
-║     📱  PAIRING CODE  📱    ║
-╚═══════════════════════╝
+<b>📱 Pairing Code</b>
 
-<b>Number:</b> <code>${validNumber}</code>
-<b>Code:</b> <code>${formattedCode}</code>
+Number: <code>${validNumber}</code>
+Code: <code>${formattedCode}</code>
 
-<i>Tap the code to copy!</i>
-<i>Expires in 1 hour</i>
-
-═════════════════════════
+Open WhatsApp → Linked Devices → Pair, then enter the code.
+Valid for 1 hour.
         `.trim();
 
         bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
@@ -999,7 +931,7 @@ Upgrade your subscription to connect more devices.
 
     const validNumber = validatePhoneNumber(phoneNumber);
     if (!validNumber) {
-      return bot.sendMessage(chatId, '❌ Invalid phone number!');
+      return bot.sendMessage(chatId, '❌ Invalid phone number.');
     }
 
     let currentSessions = loadJSON('./database/paired.json', []);
@@ -1008,7 +940,7 @@ Upgrade your subscription to connect more devices.
     );
 
     if (sessionIndex === -1) {
-      return bot.sendMessage(chatId, '❌ Session not found or no permission!');
+      return bot.sendMessage(chatId, '❌ Session not found or no permission.');
     }
 
     const sessionPath = `./database/sessions/${validNumber}`;
@@ -1035,21 +967,21 @@ Upgrade your subscription to connect more devices.
     const userId = msg.from.id;
 
     if (!isOwner(userId)) {
-      return bot.sendMessage(chatId, '❌ Owner only!');
+      return bot.sendMessage(chatId, '❌ Owner only.');
     }
 
     const currentSessions = loadJSON('./database/paired.json', []);
     if (currentSessions.length === 0) {
-      return bot.sendMessage(chatId, '📭 No paired sessions!');
+      return bot.sendMessage(chatId, '📭 No paired sessions.');
     }
 
-    let text = '═══ 📱 All Sessions ═══\n\n';
+    let text = '<b>📱 All Sessions</b>\n\n';
     currentSessions.forEach((session, i) => {
       text += `<b>${i + 1}.</b> <code>${session.number}</code>\n`;
       text += `   User: <code>${session.userId}</code>\n`;
       text += `   Status: ${session.active !== false ? '🟢 Active' : '🔴 Inactive'}\n\n`;
     });
-    text += `<b>Total:</b> ${currentSessions.length}\n═══════════════════`;
+    text += `<b>Total:</b> ${currentSessions.length}`;
 
     bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
   });
@@ -1063,15 +995,15 @@ Upgrade your subscription to connect more devices.
     const userSessions = currentSessions.filter(s => String(s.userId) === String(userId));
 
     if (userSessions.length === 0) {
-      return bot.sendMessage(chatId, '📭 No sessions found!');
+      return bot.sendMessage(chatId, '📭 No sessions found.');
     }
 
-    let text = '═══ 📱 Your Sessions ═══\n\n';
+    let text = '<b>📱 Your Sessions</b>\n\n';
     userSessions.forEach((session, i) => {
       text += `<b>${i + 1}.</b> <code>${session.number}</code>\n`;
       text += `   Status: ${session.active !== false ? '🟢 Active' : '🔴 Inactive'}\n\n`;
     });
-    text += `<b>Total:</b> ${userSessions.length}\n═══════════════════`;
+    text += `<b>Total:</b> ${userSessions.length}`;
 
     bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
   });
@@ -1107,15 +1039,13 @@ Upgrade your subscription to connect more devices.
     const { effectivePlan } = await getSubStatus(userId);
 
     const text = `
-═══ 👤 Your Info ═══
+<b>👤 Your Info</b>
 
-<b>User ID:</b> <code>${userId}</code>
-<b>Username:</b> @${username}
-<b>Name:</b> ${firstName}
-<b>Plan:</b> ${effectivePlan.replace('_', ' ')}
-<b>Owner:</b> ${isOwner(userId) ? '✅ Yes' : '❌ No'}
-
-═══════════════════
+🆔 User ID: <code>${userId}</code>
+👤 Username: @${username}
+📛 Name: ${firstName}
+📦 Plan: ${effectivePlan.replace('_', ' ')}
+👑 Role: ${isOwner(userId) ? 'Owner' : 'User'}
     `.trim();
 
     bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
@@ -1127,7 +1057,7 @@ Upgrade your subscription to connect more devices.
     const userId = msg.from.id;
 
     if (!isOwner(userId)) {
-      return bot.sendMessage(chatId, '❌ Admin only!');
+      return bot.sendMessage(chatId, '❌ Admin only.');
     }
 
     await sendAdminPanel(bot, chatId);
@@ -1138,7 +1068,7 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const parts = match[1].trim().split(' ');
     if (parts.length < 2) {
@@ -1148,7 +1078,7 @@ Upgrade your subscription to connect more devices.
     const targetId = parseInt(parts[0]);
     const planKey = parts[1].toUpperCase();
 
-    if (isNaN(targetId)) return bot.sendMessage(chatId, '❌ Invalid Telegram ID!');
+    if (isNaN(targetId)) return bot.sendMessage(chatId, '❌ Invalid Telegram ID.');
     if (!PLANS[planKey]) return bot.sendMessage(chatId, `❌ Invalid plan! Choose: ${Object.keys(PLANS).join(', ')}`);
 
     const result = await adminUpgrade(targetId, planKey);
@@ -1159,7 +1089,7 @@ Upgrade your subscription to connect more devices.
       try {
         bot.sendMessage(
           targetId,
-          `🎉 <b>Your subscription has been upgraded!</b>\n\n📦 Plan: <b>${PLANS[planKey].name}</b>\n📱 Devices: <b>${PLANS[planKey].maxDevices === 999 ? 'Unlimited' : PLANS[planKey].maxDevices}</b>\n⏳ Valid: 30 Days`,
+          `✅ <b>Your subscription has been upgraded.</b>\n\n📦 Plan: <b>${PLANS[planKey].name}</b>\n📱 Devices: <b>${PLANS[planKey].maxDevices === 999 ? 'Unlimited' : PLANS[planKey].maxDevices}</b>\n⏳ Valid: 30 days`,
           { parse_mode: 'HTML' }
         );
       } catch {}
@@ -1173,10 +1103,10 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const targetId = parseInt(match[1].trim());
-    if (isNaN(targetId)) return bot.sendMessage(chatId, '❌ Invalid Telegram ID!');
+    if (isNaN(targetId)) return bot.sendMessage(chatId, '❌ Invalid Telegram ID.');
 
     const result = await adminDowngrade(targetId);
     if (result.success) {
@@ -1191,11 +1121,11 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const targetId = parseInt(match[1]);
     if (isNaN(targetId)) {
-      return bot.sendMessage(chatId, '❌ Invalid user ID!\n\n<b>Usage:</b> /addprem 123456789', {
+      return bot.sendMessage(chatId, '❌ Invalid user ID.\n\n<b>Usage:</b> /addprem 123456789', {
         parse_mode: 'HTML',
       });
     }
@@ -1216,10 +1146,10 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const targetId = parseInt(match[1]);
-    if (isNaN(targetId)) return bot.sendMessage(chatId, '❌ Invalid user ID!');
+    if (isNaN(targetId)) return bot.sendMessage(chatId, '❌ Invalid user ID.');
 
     const result = await adminDowngrade(targetId);
     if (result.success) {
@@ -1234,7 +1164,7 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const mode = match[1];
     settings.premiumOnly = mode === 'on';
@@ -1250,7 +1180,7 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const mode = match[1];
     settings.publicMode = mode === 'on';
@@ -1267,7 +1197,7 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const mode = match[1];
     settings.selfMode = mode === 'on';
@@ -1284,7 +1214,7 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const message = match[1];
     const prisma = require('./lib/prismaClient');
@@ -1319,7 +1249,7 @@ Upgrade your subscription to connect more devices.
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only!');
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
 
     const args = match[1].trim().split(' ');
     const action = args[0];
@@ -1363,37 +1293,34 @@ Upgrade your subscription to connect more devices.
   bot.onText(/\/help/, (msg) => {
     const chatId = msg.chat.id;
     const helpText = `
-╔══════════════════════════╗
-║       📋 COMMAND LIST        ║
-╚══════════════════════════╝
+<b>📋 Commands</b>
 
-<b>General:</b>
-/start — Start bot
+<b>General</b>
+/start — Main menu
 /myid — Your profile
 /help — This message
 
-<b>Pairing:</b>
-/pair [number] — Pair device
-/delpair [number] — Delete pair
+<b>Pairing</b>
+/pair [number] — Pair a device
+/delpair [number] — Remove a device
 /listsessions — Your sessions
 /mydevices — Manage devices
 
-<b>Subscription:</b>
-/subscription — Subscription info
-/verify [ref] — Verify payment manually
+<b>Subscription</b>
+/subscription — Plan and status
+/verify [ref] — Verify a payment
 
-<b>Owner Only:</b>
+<b>Owner only</b>
 /admin — Admin panel
-/adminupgrade [id] [plan] — Upgrade user
-/admindowngrade [id] — Downgrade user
-/addprem [id] — Quick premium (5 devices)
-/delprem [id] — Remove premium
-/premium on/off — Toggle premium-only mode
+/adminupgrade [id] [plan] — Upgrade a user
+/admindowngrade [id] — Downgrade a user
+/addprem [id] — Grant premium (5 devices)
+/delprem [id] — Revoke premium
+/premium on|off — Toggle premium-only mode
 /listpaired — All sessions
-/broadcast [msg] — Broadcast message
+/broadcast [msg] — Send a broadcast
 /coupon create|delete|list — Manage coupons
-
-══════════════════════════`.trim();
+    `.trim();
 
     bot.sendMessage(chatId, helpText, { parse_mode: 'HTML' });
   });
