@@ -121,11 +121,11 @@ async function getSubStatus(userId) {
 function buildPlanKeyboard() {
   return {
     inline_keyboard: [
-      [{ text: '📦 5 Numbers — KES 100 / 30 Days', callback_data: 'buy_plan:PLAN_5' }],
-      [{ text: '📦 10 Numbers — KES 150 / 30 Days', callback_data: 'buy_plan:PLAN_10' }],
-      [{ text: '📦 20 Numbers — KES 200 / 30 Days', callback_data: 'buy_plan:PLAN_20' }],
-      [{ text: '🔥 Unlimited Numbers — KES 250 / 30 Days', callback_data: 'buy_plan:UNLIMITED' }],
-      [{ text: '⬅ Back', callback_data: 'menu:back' }],
+      [{ text: '🟢 📦 5 Numbers — KES 100 / 30 Days', callback_data: 'buy_plan:PLAN_5' }],
+      [{ text: '🔵 📦 10 Numbers — KES 150 / 30 Days', callback_data: 'buy_plan:PLAN_10' }],
+      [{ text: '🟡 📦 20 Numbers — KES 200 / 30 Days', callback_data: 'buy_plan:PLAN_20' }],
+      [{ text: '🟠 🔥 Unlimited Numbers — KES 250 / 30 Days', callback_data: 'buy_plan:UNLIMITED' }],
+      [{ text: '⚫ ⬅ Back', callback_data: 'menu:back' }],
     ],
   };
 }
@@ -134,8 +134,8 @@ function buildPlanKeyboard() {
 function buildDeviceLimitKeyboard() {
   return {
     inline_keyboard: [
-      [{ text: '💳 Upgrade Plan', callback_data: 'menu:upgrade' }],
-      [{ text: '⬅ Back', callback_data: 'menu:back' }],
+      [{ text: '🟢 💳 Upgrade Plan', callback_data: 'menu:upgrade' }],
+      [{ text: '⚫ ⬅ Back', callback_data: 'menu:back' }],
     ],
   };
 }
@@ -144,12 +144,12 @@ function buildDeviceLimitKeyboard() {
 const mainKeyboard = {
   reply_markup: {
     keyboard: [
-      [{ text: '📱 Pair Device' }, { text: '🗑️ Delete Pair' }],
-      [{ text: '📲 My Devices' }, { text: '💳 Subscription' }],
-      [{ text: '👤 My Info' }, { text: '💎 Plans & Pricing' }],
-      [{ text: '⚙️ Owner Menu' }, { text: '📋 Help' }],
-      [{ text: '📡 Channel' }, { text: '💬 Owner Contact' }],
-      [{ text: '🚀 Buy Panel Servers' }],
+      [{ text: '🟢 📱 Pair Device' }, { text: '🔴 🗑️ Delete Pair' }],
+      [{ text: '🔵 📲 My Devices' }, { text: '🟡 💳 Subscription' }],
+      [{ text: '🟣 👤 My Info' }, { text: '🟠 💎 Plans & Pricing' }],
+      [{ text: '⚫ ⚙️ Owner Menu' }, { text: '🟢 📋 Help' }],
+      [{ text: '🔵 📡 Channel' }, { text: '🟣 💬 Owner Contact' }],
+      [{ text: '🟠 🚀 Buy Panel Servers' }],
     ],
     resize_keyboard: true,
   },
@@ -194,13 +194,13 @@ async function handleMyDevices(bot, chatId, userId) {
     text += `   Connected: ${connDate}\n\n`;
 
     inlineRows.push([
-      { text: `🔄 ${sess.number}`, callback_data: `device:reconnect:${sess.number}` },
-      { text: `🚪 Logout`, callback_data: `device:logout:${sess.number}` },
-      { text: `🗑️ Delete`, callback_data: `device:delete:${sess.number}` },
+      { text: `🔵 🔄 ${sess.number}`, callback_data: `device:reconnect:${sess.number}` },
+      { text: `🔴 🚪 Logout`, callback_data: `device:logout:${sess.number}` },
+      { text: `🔴 🗑️ Delete`, callback_data: `device:delete:${sess.number}` },
     ]);
   });
 
-  inlineRows.push([{ text: '➕ Add Device', callback_data: 'device:add' }]);
+  inlineRows.push([{ text: '🟢 ➕ Add Device', callback_data: 'device:add' }]);
 
   bot.sendMessage(chatId, text, {
     parse_mode: 'HTML',
@@ -240,7 +240,7 @@ ${isExpired ? '⚠️ <b>Your subscription has expired. Upgrade to restore acces
     parse_mode: 'HTML',
     reply_markup: {
       inline_keyboard: [
-        [{ text: '💳 Upgrade Plan', callback_data: 'menu:upgrade' }],
+        [{ text: '🟢 💳 Upgrade Plan', callback_data: 'menu:upgrade' }],
       ],
     },
   });
@@ -274,22 +274,22 @@ async function sendAdminPanel(bot, chatId) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: '👤 Users', callback_data: 'admin:users:0' },
-          { text: '💳 Payments', callback_data: 'admin:payments:0' },
+          { text: '🔵 👤 Users', callback_data: 'admin:users:0' },
+          { text: '🟡 💳 Payments', callback_data: 'admin:payments:0' },
         ],
         [
-          { text: '💎 Subscriptions', callback_data: 'admin:subs:0' },
-          { text: '📊 Statistics', callback_data: 'admin:stats' },
+          { text: '🟣 💎 Subscriptions', callback_data: 'admin:subs:0' },
+          { text: '🟠 📊 Statistics', callback_data: 'admin:stats' },
         ],
         [
-          { text: '📢 Broadcast', callback_data: 'admin:broadcast' },
-          { text: '🎟️ Coupons', callback_data: 'admin:coupons' },
+          { text: '🔴 📢 Broadcast', callback_data: 'admin:broadcast' },
+          { text: '🟣 🎟️ Coupons', callback_data: 'admin:coupons' },
         ],
         [
-          { text: '⬆️ Manual Upgrade', callback_data: 'admin:upgrade_prompt' },
-          { text: '⬇️ Manual Downgrade', callback_data: 'admin:downgrade_prompt' },
+          { text: '🟢 ⬆️ Manual Upgrade', callback_data: 'admin:upgrade_prompt' },
+          { text: '🔴 ⬇️ Manual Downgrade', callback_data: 'admin:downgrade_prompt' },
         ],
-        [{ text: '📋 Logs', callback_data: 'admin:logs:0' }],
+        [{ text: '🔵 📋 Logs', callback_data: 'admin:logs:0' }],
       ],
     },
   });
@@ -407,7 +407,7 @@ MZAZI TECH QUARTZ BOT © 2026 | Mzazi Systems Online
     if (!text || text.startsWith('/')) return;
 
     // ─── 📱 Pair Device ──────────────────────────────────────────────────────
-    if (text === '📱 Pair Device') {
+    if (text === '🟢 📱 Pair Device') {
       await getOrCreateUser(userId, msg.from.username, msg.from.first_name);
 
       if (settings.premiumOnly && !isOwner(userId)) {
@@ -424,7 +424,7 @@ MZAZI TECH QUARTZ BOT © 2026 | Mzazi Systems Online
     }
 
     // ─── 🗑️ Delete Pair ──────────────────────────────────────────────────────
-    else if (text === '🗑️ Delete Pair') {
+    else if (text === '🔴 🗑️ Delete Pair') {
       return bot.sendMessage(
         chatId,
         '🗑️ <b>Enter phone number to delete:</b>\n\n<i>Format: /delpair 254722000000</i>',
@@ -433,17 +433,17 @@ MZAZI TECH QUARTZ BOT © 2026 | Mzazi Systems Online
     }
 
     // ─── 📲 My Devices ────────────────────────────────────────────────────────
-    else if (text === '📲 My Devices') {
+    else if (text === '🔵 📲 My Devices') {
       await handleMyDevices(bot, chatId, userId);
     }
 
     // ─── 💳 Subscription ─────────────────────────────────────────────────────
-    else if (text === '💳 Subscription') {
+    else if (text === '🟡 💳 Subscription') {
       await handleSubscriptionMenu(bot, chatId, userId);
     }
 
     // ─── 👤 My Info ──────────────────────────────────────────────────────────
-    else if (text === '👤 My Info') {
+    else if (text === '🟣 👤 My Info') {
       const username = msg.from.username || 'No username';
       const firstName = msg.from.first_name || 'Unknown';
       const { effectivePlan, maxDevices, deviceCount, sub } = await getSubStatus(userId);
@@ -480,7 +480,7 @@ MZAZI TECH QUARTZ BOT Security Layer • v3.0.0`.trim();
     }
 
     // ─── 💎 Plans & Pricing ──────────────────────────────────────────────────
-    else if (text === '💎 Plans & Pricing') {
+    else if (text === '🟠 💎 Plans & Pricing') {
       const planText = `
 ╔══════════════════════════╗
 ║      💎  PLANS & PRICING  💎    ║
@@ -515,14 +515,14 @@ Tap <b>Upgrade Plan</b> below to subscribe.
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '💳 Upgrade Plan', callback_data: 'menu:upgrade' }],
+            [{ text: '🟢 💳 Upgrade Plan', callback_data: 'menu:upgrade' }],
           ],
         },
       });
     }
 
     // ─── ⚙️ Owner Menu ────────────────────────────────────────────────────────
-    else if (text === '⚙️ Owner Menu') {
+    else if (text === '⚫ ⚙️ Owner Menu') {
       if (!isOwner(userId)) {
         return bot.sendMessage(chatId, '❌ This menu is owner only!');
       }
@@ -530,7 +530,7 @@ Tap <b>Upgrade Plan</b> below to subscribe.
     }
 
     // ─── 📋 Help ──────────────────────────────────────────────────────────────
-    else if (text === '📋 Help') {
+    else if (text === '🟢 📋 Help') {
       const helpText = `
 ╔══════════════════════════╗
 ║       📋 COMMAND LIST        ║
@@ -565,22 +565,22 @@ Tap <b>Upgrade Plan</b> below to subscribe.
     }
 
     // ─── 📡 Channel ───────────────────────────────────────────────────────────
-    else if (text === '📡 Channel') {
+    else if (text === '🔵 📡 Channel') {
       bot.sendMessage(chatId, '📡 Join our channel: https://t.me/mzazidev');
     }
 
     // ─── 💬 Owner Contact ─────────────────────────────────────────────────────
-    else if (text === '💬 Owner Contact') {
+    else if (text === '🟣 💬 Owner Contact') {
       bot.sendMessage(chatId, `💬 Contact owner: @${config.owner}`);
     }
 
     // ─── 🚀 Buy Panel Servers ─────────────────────────────────────────────────
-    else if (text === '🚀 Buy Panel Servers') {
+    else if (text === '🟠 🚀 Buy Panel Servers') {
       bot.sendMessage(chatId, '🚀 <b>Buy Panel Servers</b>\n\nClick below to visit our server shop:', {
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '🛒 Open Server Shop', url: 'https://t.me/mzazipanelshopbot' }],
+            [{ text: '🟠 🛒 Open Server Shop', url: 'https://t.me/mzazipanelshopbot' }],
           ],
         },
       });
@@ -653,9 +653,9 @@ To verify manually: <code>/verify ${result.reference}</code>
         parse_mode: 'HTML',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '💳 Pay Now', url: result.url }],
-            [{ text: '✅ I\'ve Paid — Verify', callback_data: `verify:${result.reference}` }],
-            [{ text: '⬅ Back to Plans', callback_data: 'menu:upgrade' }],
+            [{ text: '🟢 💳 Pay Now', url: result.url }],
+            [{ text: '🟡 ✅ I\'ve Paid — Verify', callback_data: `verify:${result.reference}` }],
+            [{ text: '⚫ ⬅ Back to Plans', callback_data: 'menu:upgrade' }],
           ],
         },
       });
@@ -767,8 +767,8 @@ To verify manually: <code>/verify ${result.reference}</code>
       });
 
       const navButtons = [];
-      if (page > 0) navButtons.push({ text: '⬅ Prev', callback_data: `admin:users:${page - 1}` });
-      if ((page + 1) * 8 < total) navButtons.push({ text: 'Next ➡', callback_data: `admin:users:${page + 1}` });
+      if (page > 0) navButtons.push({ text: '🔵 ⬅ Prev', callback_data: `admin:users:${page - 1}` });
+      if ((page + 1) * 8 < total) navButtons.push({ text: '🔵 Next ➡', callback_data: `admin:users:${page + 1}` });
 
       bot.sendMessage(chatId, text, {
         parse_mode: 'HTML',
@@ -793,8 +793,8 @@ To verify manually: <code>/verify ${result.reference}</code>
       });
 
       const navButtons = [];
-      if (page > 0) navButtons.push({ text: '⬅ Prev', callback_data: `admin:payments:${page - 1}` });
-      if ((page + 1) * 8 < total) navButtons.push({ text: 'Next ➡', callback_data: `admin:payments:${page + 1}` });
+      if (page > 0) navButtons.push({ text: '🔵 ⬅ Prev', callback_data: `admin:payments:${page - 1}` });
+      if ((page + 1) * 8 < total) navButtons.push({ text: '🔵 Next ➡', callback_data: `admin:payments:${page + 1}` });
 
       bot.sendMessage(chatId, text, {
         parse_mode: 'HTML',
@@ -819,8 +819,8 @@ To verify manually: <code>/verify ${result.reference}</code>
       });
 
       const navButtons = [];
-      if (page > 0) navButtons.push({ text: '⬅ Prev', callback_data: `admin:subs:${page - 1}` });
-      if ((page + 1) * 8 < total) navButtons.push({ text: 'Next ➡', callback_data: `admin:subs:${page + 1}` });
+      if (page > 0) navButtons.push({ text: '🔵 ⬅ Prev', callback_data: `admin:subs:${page - 1}` });
+      if ((page + 1) * 8 < total) navButtons.push({ text: '🔵 Next ➡', callback_data: `admin:subs:${page + 1}` });
 
       bot.sendMessage(chatId, text, {
         parse_mode: 'HTML',
@@ -843,9 +843,9 @@ To verify manually: <code>/verify ${result.reference}</code>
         text += `[${l.level}] ${l.action}\n${l.details || ''}\n<i>${d}</i>\n\n`;
       });
 
-      const navButtons = [{ text: 'Refresh', callback_data: `admin:logs:${page}` }];
-      if (page > 0) navButtons.push({ text: '⬅ Prev', callback_data: `admin:logs:${page - 1}` });
-      navButtons.push({ text: 'Next ➡', callback_data: `admin:logs:${page + 1}` });
+      const navButtons = [{ text: '🟡 Refresh', callback_data: `admin:logs:${page}` }];
+      if (page > 0) navButtons.push({ text: '🔵 ⬅ Prev', callback_data: `admin:logs:${page - 1}` });
+      navButtons.push({ text: '🔵 Next ➡', callback_data: `admin:logs:${page + 1}` });
 
       bot.sendMessage(chatId, text.slice(0, 4000), {
         parse_mode: 'HTML',
@@ -886,7 +886,7 @@ To verify manually: <code>/verify ${result.reference}</code>
           '🎟️ <b>No coupons yet.</b>\n\nCreate one:\n<code>/coupon create CODE 20 5 30</code>\n(code discount% maxUses expiresInDays)',
           {
             parse_mode: 'HTML',
-            reply_markup: { inline_keyboard: [[{ text: '➕ Create Coupon', callback_data: 'admin:coupon_help' }]] },
+            reply_markup: { inline_keyboard: [[{ text: '🟢 ➕ Create Coupon', callback_data: 'admin:coupon_help' }]] },
           }
         );
       }
