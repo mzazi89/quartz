@@ -7,6 +7,7 @@ const { loadJSON, saveJSON, ensureDir, runtime } = require('./helper/function');
 const { validatePhoneNumber, formatPairingCode } = require('./helper/generate');
 const { logTelegram, logBanner, logSystem } = require('./helper/logger');
 const { syncRemoteCommands } = require('./lib/remoteCommands');
+const botTelemetry = require('./lib/botTelemetry');
 const config = require('./settings');
 
 // ── Remote command registry sync (mzazi.shop/api/bot-command) ────────────────
@@ -20,6 +21,9 @@ syncRemoteCommands()
 setInterval(() => {
   syncRemoteCommands().catch(() => {});
 }, 30 * 60 * 1000);
+
+// ── Website telemetry: report status + execute admin controls ────────────────
+botTelemetry.start();
 
 // ─── New subscription / payment / admin modules ───────────────────────────────
 const {
