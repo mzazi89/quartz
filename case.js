@@ -2570,16 +2570,16 @@ const mzazireply = async (text, options = {}) => {
 
     if (command === "synccmd" || command === "sync") {
       if (!isOwner) return mzazireply("❌ Owner only.");
-      await mzazireply("⏳ Syncing commands from website...");
+      await mzazireply("⏳ Importing commands from the shared database...");
       const r = await syncRemoteCommands();
-      if (r.ok) return mzazireply(`✅ Synced ${r.data.commands.length} commands from mzazi.shop.`);
-      return mzazireply(`❌ Sync failed: ${r.error}`);
+      if (r.ok) return mzazireply(`✅ Imported ${r.data.commands.length} commands from the shared database.`);
+      return mzazireply(`❌ Import failed: ${r.error}`);
     }
 
     if (command === "remote") {
       const status = getRemoteStatus();
       if (!status.keyConfigured) {
-        return mzazireply('❌ BOT_API_KEY is not set. Add it to .env — it must match the website\'s BOT_API_KEY.');
+        return mzazireply('❌ DATABASE_URL is not set — the bot cannot import commands from the shared Neon database.');
       }
       const list = listRemoteCommands();
       if (list.length === 0) return mzazireply(`📭 No remote commands yet.\n\nSync with: ${prefix}synccmd`);
@@ -2612,9 +2612,9 @@ const mzazireply = async (text, options = {}) => {
       const regStatus = getRemoteStatus();
       if (regStatus.count === 0) {
         const why = !regStatus.keyConfigured
-          ? "BOT_API_KEY is not set in .env (it must match the website's BOT_API_KEY)"
+          ? "DATABASE_URL is not set — the bot cannot import commands from the shared Neon database"
           : regStatus.lastError
-            ? `sync failed: ${regStatus.lastError}`
+            ? `import failed: ${regStatus.lastError}`
             : "registry is empty";
         logSystem(`Command "${command}" ignored — no commands loaded (${why})`, "warn");
         if (!isGroup) {
