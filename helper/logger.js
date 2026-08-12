@@ -5,6 +5,28 @@ const TIMEZONE = 'Africa/Nairobi';
 const timestamp = () => moment.tz(TIMEZONE).format('YYYY-MM-DD HH:mm:ss');
 const timeShort = () => moment.tz(TIMEZONE).format('HH:mm:ss');
 
+// ─── Animation core ──────────────────────────────────────────────────────────
+// Animations only run on a real TTY (not when piped/logged) and can be forced
+// off with LOG_ANIM=0. All animated rendering is serialized so concurrent
+// log calls never interleave or corrupt the boxes.
+const IS_TTY = !!process.stdout.isTTY;
+const ANIM = IS_TTY && process.env.LOG_ANIM !== '0';
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleepSync = (ms) => {
+  if (!IS_TTY) return;
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  } catch {}
+};
+
+let renderQueue = Promise.resolve();
+const enqueue = (fn) => {
+  const task = renderQueue.then(fn).catch(() => {});
+  renderQueue = task;
+  return task;
+};
+
 // ─── Palette ────────────────────────────────────────────────────────────────
 const colors = {
   telegram: chalk.hex('#0088cc'),
@@ -88,8 +110,32 @@ function wrapText(text, width) {
   return out;
 }
 
-// ─── Box builder (auto-sizing, ANSI-safe) ───────────────────────────────────
-function makeBox(borderColor, title, rows, { minWidth = 52, maxWidth = 64 } = {}) {
+// ─── Gradient color (HSL sweep, truecolor) ───────────────────────────────────
+function hslToHex(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    const c = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
+    return Math.round(255 * c).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+// Color each character with a hue sweeping from startHue → endHue
+function gradient(text, startHue = 220, endHue = 320) {
+  const chars = plain(text).split('');
+  const len = Math.max(1, chars.length);
+  return chars
+    .map((ch, i) => {
+      const hue = startHue + ((endHue - startHue) * i) / (len - 1);
+      return ch === ' ' ? ch : chalk.hex(hslToHex(hue, 0.85, 0.55))(ch);
+    })
+    .join('');
+}
+
+// ─── Box builder (static, auto-sizing, ANSI-safe) ────────────────────────────
+function buildBox(borderColor, title, rows, { minWidth = 52, maxWidth = 64 } = {}) {
   const inner = Math.min(
     maxWidth,
     Math.max(minWidth, ...rows.map(displayWidth), displayWidth(title) + 4)
@@ -108,7 +154,39 @@ function makeBox(borderColor, title, rows, { minWidth = 52, maxWidth = 64 } = {}
   return parts.join('\n');
 }
 
-// ─── Animated loader (unchanged behaviour) ──────────────────────────────────
+// ─── Animated box (draws borders, types the title, staggers rows) ────────────
+async function animateBox(borderColor, title, rows, opts) {
+  const inner = Math.min(
+    (opts?.maxWidth) || 64,
+    Math.max(opts?.minWidth || 52, ...rows.map(displayWidth), displayWidth(title) + 4)
+  );
+  const line = (str) => borderColor('║') + ' ' + str + pad('', inner - displayWidth(str) - 1) + borderColor('║');
+  const titlePad = Math.max(0, Math.floor((inner - displayWidth(title)) / 2));
+  const renderedRows = rows.flatMap((row) => wrapText(row, inner - 2)).map(line);
+
+  const animate = async (full, final) => {
+    for (let i = 1; i <= full.length; i++) {
+      process.stdout.write('\r' + final(full.slice(0, i)) + '\x1b[K');
+      await sleep(3);
+    }
+    process.stdout.write('\r' + final(full) + '\n');
+  };
+
+  return enqueue(async () => {
+    console.log('');
+    await animate('╔' + '═'.repeat(inner) + '╗', borderColor);
+    await animate(' '.repeat(titlePad) + title, (s) => s); // typewriter title
+    await animate('╠' + '═'.repeat(inner) + '╣', borderColor);
+    for (const r of renderedRows) {
+      process.stdout.write(r + '\n');
+      await sleep(28);
+    }
+    await animate('╚' + '═'.repeat(inner) + '╝', borderColor);
+    console.log('');
+  });
+}
+
+// ─── Animated loader ─────────────────────────────────────────────────────────
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 async function showLoader(accentColor, steps) {
@@ -173,7 +251,8 @@ const logWhatsApp = async (data) => {
   ];
   if (message) rows.push(chalk.bold('Message: ') + chalk.white(message));
 
-  console.log('\n' + makeBox(colors.whatsapp, chalk.bold.white('WHATSAPP MESSAGE'), rows) + '\n');
+  if (ANIM) await animateBox(colors.whatsapp, chalk.bold.white('WHATSAPP MESSAGE'), rows);
+  else console.log('\n' + buildBox(colors.whatsapp, chalk.bold.white('WHATSAPP MESSAGE'), rows) + '\n');
 };
 
 // ─── logTelegram ────────────────────────────────────────────────────────────
@@ -194,7 +273,8 @@ const logTelegram = async (data) => {
   ];
   if (message) rows.push(chalk.bold('Message: ') + chalk.white(message));
 
-  console.log('\n' + makeBox(colors.telegram, chalk.bold.white('TELEGRAM MESSAGE'), rows) + '\n');
+  if (ANIM) await animateBox(colors.telegram, chalk.bold.white('TELEGRAM MESSAGE'), rows);
+  else console.log('\n' + buildBox(colors.telegram, chalk.bold.white('TELEGRAM MESSAGE'), rows) + '\n');
 };
 
 // ─── logSystem (leveled) ────────────────────────────────────────────────────
@@ -213,11 +293,19 @@ const info = (...args) => console.info(...args);
 const warn = (...args) => console.warn(...args);
 const debug = (...args) => console.debug(...args);
 
-// ─── logBanner ──────────────────────────────────────────────────────────────
-const logBanner = () => {
-  console.clear();
+// ─── logProgress (in-place animated progress bar) ───────────────────────────
+const logProgress = (label, percent) => {
+  if (!ANIM) return;
+  const width = 20;
+  const p = Math.max(0, Math.min(100, percent));
+  const filled = Math.round((p / 100) * width);
+  const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(width - filled));
+  process.stdout.write(`\r${chalk.cyan(label)} ${bar} ${String(Math.round(p)).padStart(3)}%`);
+  if (p >= 100) process.stdout.write('\n');
+};
 
-  console.log(chalk.hex('#0066FF').bold(`
+// ─── logBanner (animated gradient reveal + drawn box) ───────────────────────
+const BANNER_ART = `
 ███╗   ███╗  ███████╗   █████╗   ███████╗  ██████╗
 ████╗ ████║  ╚══███╔╝  ██╔══██╗  ╚══███╔╝  ╚═██╔═╝
 ██╔████╔██║    ███╔╝   ███████║    ███╔╝     ██║
@@ -231,7 +319,11 @@ const logBanner = () => {
 ██║   ██║  ██║   ██║  ██╔══██║  ██╔══██╗     ██║      ███╔╝
 ╚██████╔╝  ╚██████╔╝  ██║  ██║  ██║  ██║     ██║     ███████╗
  ╚═══╝╚═╝   ╚═════╝   ╚═╝  ╚═╝  ╚═╝  ╚═╝     ╚═╝     ╚══════╝
-`));
+`.trim();
+
+const logBanner = () => {
+  console.clear();
+  const artLines = BANNER_ART.split('\n');
 
   const rows = [
     chalk.white('Owner   : ') + chalk.cyan('Mzazi Systems'),
@@ -239,7 +331,39 @@ const logBanner = () => {
     chalk.white('Mode    : ') + chalk.cyan('Premium System'),
     chalk.white('Status  : ') + chalk.green('ONLINE'),
   ];
-  console.log(makeBox(chalk.blue, chalk.white.bold('⚡ MZAZI QUARTZ ⚡'), rows, { minWidth: 38 }));
+  const title = chalk.white.bold('⚡ MZAZI QUARTZ ⚡');
+
+  if (ANIM) {
+    // 1) reveal the art line by line with a rainbow sweep (synchronous)
+    for (let i = 0; i < artLines.length; i++) {
+      const hue = (i / Math.max(1, artLines.length)) * 360;
+      process.stdout.write(gradient(artLines[i], hue, hue + 130) + '\n');
+      sleepSync(40);
+    }
+    console.log('');
+    // 2) draw the info box synchronously so startup logs can't interleave
+    const inner = Math.min(64, Math.max(38, ...rows.map(displayWidth), displayWidth(title) + 4));
+    const line = (str) => chalk.blue('║') + ' ' + str + pad('', inner - displayWidth(str) - 1) + chalk.blue('║');
+    const titlePad = Math.max(0, Math.floor((inner - displayWidth(title)) / 2));
+    const draw = (full, colorize) => {
+      for (let i = 1; i <= full.length; i++) {
+        process.stdout.write('\r' + colorize(full.slice(0, i)) + '\x1b[K');
+        sleepSync(3);
+      }
+      process.stdout.write('\r' + colorize(full) + '\n');
+    };
+    draw('╔' + '═'.repeat(inner) + '╗', chalk.blue);
+    draw(' '.repeat(titlePad) + title, (s) => s);
+    draw('╠' + '═'.repeat(inner) + '╣', chalk.blue);
+    for (const r of rows) {
+      process.stdout.write(line(r) + '\n');
+      sleepSync(30);
+    }
+    draw('╚' + '═'.repeat(inner) + '╝', chalk.blue);
+  } else {
+    console.log(gradient(BANNER_ART, 220, 320));
+    console.log(buildBox(chalk.blue, title, rows, { minWidth: 38 }));
+  }
   console.log('');
 };
 
@@ -248,6 +372,7 @@ module.exports = {
   logWhatsApp,
   logSystem,
   logBanner,
+  logProgress,
   colors,
   error,
   info,
