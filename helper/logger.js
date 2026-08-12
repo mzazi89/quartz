@@ -1,37 +1,127 @@
 const chalk = require('chalk');
 const moment = require('moment-timezone');
 
-// ─── palette ────────────────────────────────────────────────────────────────
+const TIMEZONE = 'Africa/Nairobi';
+const timestamp = () => moment.tz(TIMEZONE).format('YYYY-MM-DD HH:mm:ss');
+const timeShort = () => moment.tz(TIMEZONE).format('HH:mm:ss');
+
+// ─── Palette ────────────────────────────────────────────────────────────────
 const colors = {
   telegram: chalk.hex('#0088cc'),
   whatsapp: chalk.hex('#25D366'),
   system:   chalk.hex('#FFA500'),
-  error:    chalk.hex('#FF0000'),
-  success:  chalk.hex('#00FF00'),
+  error:    chalk.hex('#FF5252'),
+  success:  chalk.hex('#4CAF50'),
+  warn:     chalk.hex('#FFC107'),
+  debug:    chalk.hex('#9E9E9E'),
   user:     chalk.hex('#FFD700'),
   command:  chalk.hex('#FF00FF'),
   group:    chalk.hex('#00CED1'),
   dm:       chalk.hex('#FF69B4'),
 };
 
-const getTime = () => moment.tz('Africa/Nairobi').format('HH:mm:ss');
+// ─── Log levels ─────────────────────────────────────────────────────────────
+// Filtering via LOG_LEVEL env (debug < info/success < warn < error)
+const LEVELS = { debug: 0, info: 1, success: 1, warn: 2, error: 3 };
+const LEVEL_META = {
+  error:   { icon: '❌', color: colors.error },
+  warn:    { icon: '⚠️', color: colors.warn },
+  info:    { icon: 'ℹ️', color: chalk.cyan },
+  success: { icon: '✅', color: colors.success },
+  debug:   { icon: '🐞', color: colors.debug },
+};
+const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
+const shouldLog = (level) =>
+  (LEVELS[level] ?? LEVELS.info) >= (LEVELS[LOG_LEVEL] ?? LEVELS.info);
 
-// ─── Animated loader ─────────────────────────────────────────────────────────
-// Plays a short terminal spinner with rotating status lines, then clears.
-// Returns a Promise so callers can await it before printing the box.
+// ─── Display-width helpers (emoji / CJK aware) ──────────────────────────────
+const plain = (str) => String(str).replace(/\x1b\[[0-9;]*m/g, '');
+
+function displayWidth(str) {
+  let w = 0;
+  for (const ch of plain(str)) {
+    const c = ch.codePointAt(0);
+    if ((c >= 0xFE00 && c <= 0xFE0F) || c === 0x200D) continue; // variation selectors / ZWJ
+    if (
+      (c >= 0x1100 && c <= 0x115F) || (c >= 0x2E80 && c <= 0xA4CF) ||
+      (c >= 0xAC00 && c <= 0xD7A3) || (c >= 0xF900 && c <= 0xFAFF) ||
+      (c >= 0xFE30 && c <= 0xFE4F) || (c >= 0xFF00 && c <= 0xFF60) ||
+      (c >= 0xFFE0 && c <= 0xFFE6) || (c >= 0x2600 && c <= 0x27BF) ||
+      (c >= 0x1F000 && c <= 0x1FAFF) || (c >= 0x20000 && c <= 0x2FFFD)
+    ) {
+      w += 2;
+    } else {
+      w += 1;
+    }
+  }
+  return w;
+}
+
+const pad = (str, n) => ' '.repeat(Math.max(0, n - displayWidth(str)));
+
+// ─── Text wrapping (display-width aware) ────────────────────────────────────
+function wrapText(text, width) {
+  const out = [];
+  for (const rawLine of plain(text).split('\n')) {
+    const words = rawLine.split(/\s+/).filter(Boolean);
+    if (words.length === 0) { out.push(''); continue; }
+
+    let cur = '';
+    for (const word of words) {
+      const candidate = cur ? cur + ' ' + word : word;
+      if (displayWidth(candidate) <= width) { cur = candidate; continue; }
+
+      if (cur) { out.push(cur); cur = word; }
+      while (displayWidth(cur) > width) {
+        let cut = 0, w = 0;
+        for (const ch of cur) {
+          const cw = displayWidth(ch);
+          if (w + cw > width) break;
+          w += cw; cut++;
+        }
+        out.push(cur.slice(0, cut));
+        cur = cur.slice(cut);
+      }
+    }
+    if (cur) out.push(cur);
+  }
+  return out;
+}
+
+// ─── Box builder (auto-sizing, ANSI-safe) ───────────────────────────────────
+function makeBox(borderColor, title, rows, { minWidth = 52, maxWidth = 64 } = {}) {
+  const inner = Math.min(
+    maxWidth,
+    Math.max(minWidth, ...rows.map(displayWidth), displayWidth(title) + 4)
+  );
+  const line = (str) => borderColor('║') + ' ' + str + pad('', inner - displayWidth(str) - 1) + borderColor('║');
+  const render = (row) => wrapText(row, inner - 2).map(line).join('\n');
+
+  const titlePad = Math.max(0, Math.floor((inner - displayWidth(title)) / 2));
+  const parts = [
+    borderColor('╔' + '═'.repeat(inner) + '╗'),
+    line(' '.repeat(titlePad) + title),
+    borderColor('╠' + '═'.repeat(inner) + '╣'),
+    rows.map(render).join('\n'),
+    borderColor('╚' + '═'.repeat(inner) + '╝'),
+  ];
+  return parts.join('\n');
+}
+
+// ─── Animated loader (unchanged behaviour) ──────────────────────────────────
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 async function showLoader(accentColor, steps) {
   return new Promise((resolve) => {
-    let frame  = 0;
-    let step   = 0;
-    let tick   = 0;
-    const STEP_EVERY = 7;   // spinner ticks before advancing to next step
-    const TICK_MS    = 55;  // ms per tick  → total ≈ steps × STEP_EVERY × TICK_MS
+    let frame = 0;
+    let step = 0;
+    let tick = 0;
+    const STEP_EVERY = 7;
+    const TICK_MS = 55;
 
     const interval = setInterval(() => {
       const spinner = accentColor(SPINNER_FRAMES[frame % SPINNER_FRAMES.length]);
-      const label   = chalk.dim(steps[Math.min(step, steps.length - 1)]);
+      const label = chalk.dim(steps[Math.min(step, steps.length - 1)]);
       process.stdout.write(`\r  ${spinner}  ${label}   `);
 
       frame++;
@@ -40,14 +130,13 @@ async function showLoader(accentColor, steps) {
 
       if (step >= steps.length) {
         clearInterval(interval);
-        process.stdout.write('\r\x1b[K'); // erase the loader line
+        process.stdout.write('\r\x1b[K');
         resolve();
       }
     }, TICK_MS);
   });
 }
 
-// ─── WhatsApp loader steps ───────────────────────────────────────────────────
 const WA_STEPS = [
   '📡 Receiving WhatsApp packet...',
   '🔐 Decrypting Signal protocol...',
@@ -56,7 +145,6 @@ const WA_STEPS = [
   '✅ Message ready!',
 ];
 
-// ─── Telegram loader steps ───────────────────────────────────────────────────
 const TG_STEPS = [
   '📡 Polling Telegram server...',
   '🔍 Reading update payload...',
@@ -65,120 +153,93 @@ const TG_STEPS = [
   '✅ Message ready!',
 ];
 
-// ─── logWhatsApp ─────────────────────────────────────────────────────────────
+// ─── logWhatsApp ────────────────────────────────────────────────────────────
 const logWhatsApp = async (data) => {
   const { sender, senderName, chatType, chatName, command, message, isGroup, isOwner, isPaid } = data;
 
   await showLoader(colors.whatsapp, WA_STEPS);
 
-  const pad = (str, n) => ' '.repeat(Math.max(0, n - (str?.length || 0)));
-  const C   = colors.whatsapp;
-
-  console.log('\n' + C('╔═══════════════════════════════════════════════════════════╗'));
-  console.log(C('║') + '  ' + chalk.bold.white('WHATSAPP MESSAGE') + '                                      ' + C('║'));
-  console.log(C('╠═══════════════════════════════════════════════════════════╣'));
-
-  const name = senderName || sender.split('@')[0];
+  const name = senderName || (sender ? sender.split('@')[0] : 'Unknown');
   const from = isGroup ? colors.group(chatName || 'Group') : colors.dm('Direct Message');
-  const fromLen = isGroup ? (chatName?.length || 5) : 14;
   const role = isOwner ? chalk.red('Owner') : isPaid ? chalk.yellow('Paid') : chalk.white('User');
-  const roleLen = isOwner ? 5 : 4;
 
-  console.log(C('║') + '  ' + chalk.bold('Time:    ') + chalk.cyan(getTime())            + pad(getTime(), 48)            + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('User:    ') + colors.user(name)                + pad(name, 48)                + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('From:    ') + from                             + pad('x'.repeat(fromLen), 48) + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('Type:    ') + chalk.magenta(chatType)          + pad(chatType, 48)            + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('Command: ') + (command ? colors.command(command) : chalk.gray('none')) + pad(command || 'none', 48) + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('Role:    ') + role                             + pad('x'.repeat(roleLen), 48) + C('║'));
-  console.log(C('╠═══════════════════════════════════════════════════════════╣'));
+  const rows = [
+    chalk.bold('Time:    ') + chalk.cyan(timeShort()),
+    chalk.bold('User:    ') + colors.user(name),
+    chalk.bold('From:    ') + from,
+    chalk.bold('Type:    ') + chalk.magenta(chatType),
+    chalk.bold('Command: ') + (command ? colors.command(command) : chalk.gray('none')),
+    chalk.bold('Role:    ') + role,
+  ];
+  if (message) rows.push(chalk.bold('Message: ') + chalk.white(message));
 
-  if (message) {
-    const lines = message.match(/.{1,55}/g) || [message];
-    lines.forEach((line, i) => {
-      const label = i === 0 ? chalk.bold('Message: ') : '         ';
-      console.log(C('║') + '  ' + label + chalk.white(line) + pad(line, 48) + C('║'));
-    });
-  }
-
-  console.log(C('╚═══════════════════════════════════════════════════════════╝') + '\n');
+  console.log('\n' + makeBox(colors.whatsapp, chalk.bold.white('WHATSAPP MESSAGE'), rows) + '\n');
 };
 
-// ─── logTelegram ─────────────────────────────────────────────────────────────
+// ─── logTelegram ────────────────────────────────────────────────────────────
 const logTelegram = async (data) => {
   const { userId, username, firstName, action, message, messageType = 'text' } = data;
 
   await showLoader(colors.telegram, TG_STEPS);
 
-  const pad = (str, n) => ' '.repeat(Math.max(0, n - (str?.toString().length || 0)));
-  const C   = colors.telegram;
-
-  console.log('\n' + C('╔═══════════════════════════════════════════════════════════╗'));
-  console.log(C('║') + '  ' + chalk.bold.white('TELEGRAM MESSAGE') + '                                       ' + C('║'));
-  console.log(C('╠═══════════════════════════════════════════════════════════╣'));
-
   const uname = `${firstName} (@${username || 'none'})`;
   const actionColored = action.toLowerCase().includes('group') ? colors.group(action) : colors.dm(action);
 
-  console.log(C('║') + '  ' + chalk.bold('Time:    ') + chalk.cyan(getTime())     + pad(getTime(), 48)          + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('User:    ') + colors.user(uname)        + pad(uname, 48)              + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('User ID: ') + chalk.yellow(userId)      + pad(userId?.toString(), 47) + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('Action:  ') + actionColored             + pad(action, 48)             + C('║'));
-  console.log(C('║') + '  ' + chalk.bold('Type:    ') + chalk.magenta(messageType) + pad(messageType, 48)       + C('║'));
-  console.log(C('╠═══════════════════════════════════════════════════════════╣'));
+  const rows = [
+    chalk.bold('Time:    ') + chalk.cyan(timeShort()),
+    chalk.bold('User:    ') + colors.user(uname),
+    chalk.bold('User ID: ') + chalk.yellow(userId),
+    chalk.bold('Action:  ') + actionColored,
+    chalk.bold('Type:    ') + chalk.magenta(messageType),
+  ];
+  if (message) rows.push(chalk.bold('Message: ') + chalk.white(message));
 
-  if (message) {
-    const lines = message.match(/.{1,55}/g) || [message];
-    lines.forEach((line, i) => {
-      const label = i === 0 ? chalk.bold('Message: ') : '         ';
-      console.log(C('║') + '  ' + label + chalk.white(line) + pad(line, 48) + C('║'));
-    });
-  }
-
-  console.log(C('╚═══════════════════════════════════════════════════════════╝') + '\n');
+  console.log('\n' + makeBox(colors.telegram, chalk.bold.white('TELEGRAM MESSAGE'), rows) + '\n');
 };
 
-// ─── logSystem ───────────────────────────────────────────────────────────────
+// ─── logSystem (leveled) ────────────────────────────────────────────────────
 const logSystem = (message, type = 'info') => {
-  const color = type === 'error' ? colors.error : type === 'success' ? colors.success : colors.system;
-  const icon  = type === 'error' ? '❌' : type === 'success' ? '✅' : '📡';
-  console.log(color(`${icon} [${getTime()}] ${message}`));
+  if (!shouldLog(type)) return;
+  const meta = LEVEL_META[type] || LEVEL_META.info;
+  console.log(meta.color(`${meta.icon} ${chalk.dim(timestamp())} ${message}`));
 };
 
-// The command handler uses the familiar logger.error/info/warn/debug API.
-// Keep those methods available alongside the bot-specific pretty loggers.
+// Generic leveled alias
+const log = (level, message) => logSystem(message, level);
+
+// Familiar console passthroughs (kept for compatibility)
 const error = (...args) => console.error(...args);
 const info = (...args) => console.info(...args);
 const warn = (...args) => console.warn(...args);
 const debug = (...args) => console.debug(...args);
 
-// ─── logBanner ───────────────────────────────────────────────────────────────
+// ─── logBanner ──────────────────────────────────────────────────────────────
 const logBanner = () => {
   console.clear();
 
   console.log(chalk.hex('#0066FF').bold(`
-███╗   ██╗ █████╗  ██████╗██╗  ██╗███████╗████████╗██╗   ██╗
-████╗  ██║██╔══██╗██╔════╝██║  ██║██╔════╝╚══██╔══╝╚██╗ ██╔╝
-██╔██╗ ██║███████║██║     ███████║█████╗     ██║    ╚████╔╝
-██║╚██╗██║██╔══██║██║     ██╔══██║██╔══╝     ██║     ╚██╔╝
-██║ ╚████║██║  ██║╚██████╗██║  ██║███████╗   ██║      ██║
-╚═╝  ╚═══╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝   ╚═╝      ╚═╝
+███╗   ███╗  ███████╗   █████╗   ███████╗  ██████╗
+████╗ ████║  ╚══███╔╝  ██╔══██╗  ╚══███╔╝  ╚═██╔═╝
+██╔████╔██║    ███╔╝   ███████║    ███╔╝     ██║
+██║╚██╔╝██║   ███╔╝    ██╔══██║   ███╔╝      ██║
+██║ ╚═╝ ██║  ███████╗  ██║  ██║  ███████╗    ██║
+╚═╝     ╚═╝  ╚══════╝  ╚═╝  ╚═╝  ╚══════╝    ╚═╝
 
-██████╗ ██████╗ ██╗███╗   ███╗███████╗
-██╔══██╗██╔══██╗██║████╗ ████║██╔════╝
-██████╔╝██████╔╝██║██╔████╔██║█████╗
-██╔═══╝ ██╔══██╗██║██║╚██╔╝██║██╔══╝
-██║     ██║  ██║██║██║ ╚═╝ ██║███████╗
-╚═╝     ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝╚══════╝
+ ██████╗   ██╗   ██╗   █████╗   ██████╗   ████████╗  ███████╗
+██╔═══██╗  ██║   ██║  ██╔══██╗  ██╔══██╗  ╚══██╔══╝  ╚══███╔╝
+██║   ██║  ██║   ██║  ███████║  ██████╔╝     ██║       ███╔╝
+██║   ██║  ██║   ██║  ██╔══██║  ██╔══██╗     ██║      ███╔╝
+╚██████╔╝  ╚██████╔╝  ██║  ██║  ██║  ██║     ██║     ███████╗
+ ╚═══╝╚═╝   ╚═════╝   ╚═╝  ╚═╝  ╚═╝  ╚═╝     ╚═╝     ╚══════╝
 `));
 
-  console.log(chalk.blue('══════════════════════════════╗'));
-  console.log(chalk.blue('║') + '           ' + chalk.white.bold('👑 NACHETY PRIME 👑') + '                    ' + chalk.blue('║'));
-  console.log(chalk.blue('╠═══════════════════════════════╣'));
-  console.log(chalk.blue('║') + '  ' + chalk.white('Owner   : ') + chalk.cyan('Nachety Dev')          + '                           ' + chalk.blue('║'));
-  console.log(chalk.blue('║') + '  ' + chalk.white('Version : ') + chalk.cyan('2.0.0 Dark Edition')   + '                      '    + chalk.blue('║'));
-  console.log(chalk.blue('║') + '  ' + chalk.white('Mode    : ') + chalk.cyan('Premium System')       + '                        '  + chalk.blue('║'));
-  console.log(chalk.blue('║') + '  ' + chalk.white('Status  : ') + chalk.green('ONLINE')              + '                                ' + chalk.blue('║'));
-  console.log(chalk.blue('╚══════════════════════════════╝'));
+  const rows = [
+    chalk.white('Owner   : ') + chalk.cyan('Mzazi Systems'),
+    chalk.white('Version : ') + chalk.cyan('3.0.0'),
+    chalk.white('Mode    : ') + chalk.cyan('Premium System'),
+    chalk.white('Status  : ') + chalk.green('ONLINE'),
+  ];
+  console.log(makeBox(chalk.blue, chalk.white.bold('⚡ MZAZI QUARTZ ⚡'), rows, { minWidth: 38 }));
   console.log('');
 };
 
@@ -192,4 +253,6 @@ module.exports = {
   info,
   warn,
   debug,
+  log,
+  showLoader,
 };

@@ -16,7 +16,7 @@
   "overrides": {
     "form-data": "^4.0.0"
   },
-  "keywords": [    "mzazi-tech-quartz", "nachety", "prime", "telegram", "whatsapp", "bot", "premium", "paystack"],
+  "keywords": [    "mzazi-tech-quartz", "mzazi-quartz", "telegram", "whatsapp", "bot", "premium", "paystack"],
   "author": "Nachety Dev",
   "license": "ISC",
   "dependencies": {
