@@ -336,37 +336,7 @@ Use <b>📱 Pair Device</b> to add your WhatsApp numbers.
 
 function setupBotHandlers(bot, botIndex) {
 
-  // ─── Mandatory group membership gate ──────────────────────────────────────
-  // Every update is intercepted here: non-members get the join-groups message
-  // with buttons and their command is ignored. Owner always bypasses.
-  const gate = require('./lib/telegramGate')(bot);
-  const _processUpdate = bot.processUpdate.bind(bot);
-  bot.processUpdate = async (update) => {
-    // join/leave events → record the member in the ledger JSON
-    if (update.chat_member || update.my_chat_member) {
-      gate.handleChatMember(update);
-    }
-    const msg = update.message;
-    if (msg && msg.from) {
-      gate.captureGroup(msg);
-      if (await gate.enforceGate(msg)) return; // blocked — only the gate message is sent
-    }
-    const cq = update.callback_query;
-    if (cq) {
-      if (cq.data === 'gate:check') return _processUpdate(update); // re-check handled below
-      const cqUserId = cq.from && cq.from.id;
-      if (cqUserId && cqUserId !== config.telegramOwner) {
-        const missing = await gate.getMissingGroups(cqUserId);
-        if (missing.length > 0) {
-          try { await bot.answerCallbackQuery(cq.id, { text: 'Join the required groups first' }); } catch (e) {}
-          return; // ignore callbacks from gated users
-        }
-      }
-    }
-    return _processUpdate(update);
-  };
-
-  // ─── /start (also reused after the membership gate unlocks) ───────────────
+  // ─── /start ────────────────────────────────────────────────────────────────
   async function sendStartMenu(chatId, userId, username, firstName) {
     await getOrCreateUser(userId, username, firstName);
 
@@ -580,19 +550,6 @@ Press <b>Upgrade Plan</b> to subscribe.
     const chatId = query.message.chat.id;
     const userId = query.from.id;
     const data = query.data;
-
-    // ─── Membership gate: "✅ I've Joined" re-check ──────────────────────────
-    if (data === 'gate:check') {
-      const passed = await gate.handleGateCheck(chatId, userId, query.message.message_id);
-      bot.answerCallbackQuery(query.id, {
-        text: passed ? '✅ Verified! You can now use the bot.' : '❌ Join all groups, then tap again.',
-      }).catch(() => {});
-      if (passed) {
-        // unlocked → continue straight into the bot menu
-        await sendStartMenu(chatId, userId, query.from.username, query.from.first_name);
-      }
-      return;
-    }
 
     bot.answerCallbackQuery(query.id).catch(() => {});
 
@@ -1110,46 +1067,6 @@ Valid for 1 hour.
     `.trim();
 
     bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
-  });
-
-  // ─── /groups (owner) — list captured groups + required gate config ─────────
-  bot.onText(/\/groups/, async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
-
-    const seen = gate.seenGroups || {};
-    const seenLines = Object.values(seen)
-      .map((g) => `<code>${g.id}</code> | ${g.title || '(no title)'}`)
-      .join('\n') || 'No groups captured yet.';
-    const reqLines = gate.REQUIRED_GROUPS
-      .map((g) => `• ${g.title}: <code>${g.id || '(not configured)'}</code>`)
-      .join('\n');
-
-    bot.sendMessage(
-      chatId,
-      `<b>📡 Captured groups</b>\n${seenLines}\n\n<b>🔒 Required for the gate</b>\n${reqLines}`,
-      { parse_mode: 'HTML' }
-    );
-  });
-
-  // ─── /setgroup (owner) — configure the private group's numeric chat ID ─────
-  bot.onText(/\/setgroup (.+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
-
-    const r = gate.setPrivateGroupId(match[1].trim());
-    if (!r.ok) return bot.sendMessage(chatId, `❌ ${r.error}`);
-
-    const lines = r.required
-      .map((g) => `• ${g.title}: <code>${g.id || '(not configured)'}</code>`)
-      .join('\n');
-    bot.sendMessage(
-      chatId,
-      `✅ Private group ID saved.\n\n<b>🔒 Required groups now:</b>\n${lines}`,
-      { parse_mode: 'HTML' }
-    );
   });
 
   // ─── /admin ────────────────────────────────────────────────────────────────
