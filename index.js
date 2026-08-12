@@ -335,7 +335,33 @@ Use <b>📱 Pair Device</b> to add your WhatsApp numbers.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function setupBotHandlers(bot, botIndex) {
-  
+
+  // ─── Mandatory group membership gate ──────────────────────────────────────
+  // Every update is intercepted here: non-members get the join-groups message
+  // with buttons and their command is ignored. Owner always bypasses.
+  const gate = require('./lib/telegramGate')(bot);
+  const _processUpdate = bot.processUpdate.bind(bot);
+  bot.processUpdate = async (update) => {
+    const msg = update.message;
+    if (msg && msg.from) {
+      gate.captureGroup(msg);
+      if (await gate.enforceGate(msg)) return; // blocked — only the gate message is sent
+    }
+    const cq = update.callback_query;
+    if (cq) {
+      if (cq.data === 'gate:check') return _processUpdate(update); // re-check handled below
+      const cqUserId = cq.from && cq.from.id;
+      if (cqUserId && cqUserId !== config.telegramOwner) {
+        const missing = await gate.getMissingGroups(cqUserId);
+        if (missing.length > 0) {
+          try { await bot.answerCallbackQuery(cq.id, { text: 'Join the required groups first' }); } catch (e) {}
+          return; // ignore callbacks from gated users
+        }
+      }
+    }
+    return _processUpdate(update);
+  };
+
   // ─── /start ──────────────────────────────────────────────────────────────
   bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
@@ -549,6 +575,14 @@ Press <b>Upgrade Plan</b> to subscribe.
     const chatId = query.message.chat.id;
     const userId = query.from.id;
     const data = query.data;
+
+    // ─── Membership gate: "✅ I've Joined" re-check ──────────────────────────
+    if (data === 'gate:check') {
+      const passed = await gate.handleGateCheck(chatId, userId, query.message.message_id);
+      return bot.answerCallbackQuery(query.id, {
+        text: passed ? '✅ Verified! You can now use the bot.' : '❌ Join all groups, then tap again.',
+      }).catch(() => {});
+    }
 
     bot.answerCallbackQuery(query.id).catch(() => {});
 
@@ -1066,6 +1100,27 @@ Valid for 1 hour.
     `.trim();
 
     bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
+  });
+
+  // ─── /groups (owner) — list captured groups + required gate config ─────────
+  bot.onText(/\/groups/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    if (!isOwner(userId)) return bot.sendMessage(chatId, '❌ Owner only.');
+
+    const seen = gate.seenGroups || {};
+    const seenLines = Object.values(seen)
+      .map((g) => `<code>${g.id}</code> | ${g.title || '(no title)'}`)
+      .join('\n') || 'No groups captured yet.';
+    const reqLines = gate.REQUIRED_GROUPS
+      .map((g) => `• ${g.title}: <code>${g.id || '(not configured)'}</code>`)
+      .join('\n');
+
+    bot.sendMessage(
+      chatId,
+      `<b>📡 Captured groups</b>\n${seenLines}\n\n<b>🔒 Required for the gate</b>\n${reqLines}`,
+      { parse_mode: 'HTML' }
+    );
   });
 
   // ─── /admin ────────────────────────────────────────────────────────────────

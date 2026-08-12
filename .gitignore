@@ -3,3 +3,4 @@ node_modules/
 database/sessions/
 sessions/
 *.logdatabase/remoteCommands.json
+database/telegramGroups.json
