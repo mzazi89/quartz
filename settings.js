@@ -1,6 +1,12 @@
 module.exports = {
   botName: "MZAZI TECH QUARTZ BOT",
   owner: "Mrs Mzazi",
+
+  // Remote command registry — commands are exported from the website
+  // (https://mzazi.shop/api/bot-command). The key must match the website's
+  // BOT_API_KEY env var. Prefer setting BOT_API_KEY in .env.
+  remoteApiUrl: process.env.REMOTE_API_URL || "https://mzazi.shop/api/bot-command",
+  remoteApiKey: process.env.BOT_API_KEY || "",
   // Prefer the TELEGRAM_BOT_TOKEN secret; falls back to the token that
   // shipped in this file so the bot still boots before the secret is set.
   telegramToken: process.env.TELEGRAM_BOT_TOKEN || "8687055102:AAEYim7rob-ENfMXTfXw06MnCpzWOVn0JYA",

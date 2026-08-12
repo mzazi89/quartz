@@ -17,6 +17,7 @@ const { validatePhoneNumber } = require("./helper/generate.js");
 const logger = require("./helper/logger.js");
 const { logSystem } = require('./helper/logger.js'); // Adjust path as needed
 const { logIncomingMessage, logGroupCommand } = require("./lib/chatLogger");
+const { syncRemoteCommands, getRemoteCommand, listRemoteCommands, runRemoteCommand, getRemoteStatus } = require("./lib/remoteCommands.js");
 const { db, saveDB } = require("./lib/database");
 const {
   PAIRING_COMMAND,
@@ -2076,7 +2077,70 @@ const mzazireply = async (text, options = {}) => {
       return;
     }
 
+    // ── Remote commands (synced from mzazi.shop/api/bot-command) ───────────────
+    // Remote commands take precedence over local ones, so commands added on the
+    // website can override or extend the bot without touching the bot code.
+    if (command && !m.key.fromMe) {
+      const remoteCmd = getRemoteCommand(command);
+      if (remoteCmd) {
+        try {
+          if (remoteCmd.ownerOnly && !isOwner) return mzazireply("❌ Owner only.");
+          if (remoteCmd.adminOnly && !isAdmin && !isOwner) return mzazireply("❌ Admins only.");
+          if (remoteCmd.groupOnly && !isGroup) return mzazireply("❌ Groups only.");
+          await runRemoteCommand(remoteCmd, {
+            m,
+            mzazi,
+            text,
+            args,
+            sender,
+            pushname,
+            isOwner,
+            isAdmin,
+            isGroup,
+            isBotAdmin,
+            prefix,
+            botPhoneNum,
+            mzazireply,
+            helpers: { runtime, saveJSON, loadJSON, getToggle, setToggle, logSystem },
+          });
+        } catch (e) {
+          logSystem(`Remote command "${command}" error: ${e.message}`, "error");
+          await mzazireply(`❌ Remote command error: ${e.message}`);
+        }
+        return;
+      }
+    }
+
     switch (command) {
+      // ── Remote commands (exported from mzazi.shop/api/bot-command) ────────────
+      case 'synccmd':
+      case 'sync': {
+        if (!isOwner) return mzazireply('❌ Owner only.');
+        await mzazireply('⏳ Syncing commands from website...');
+        const r = await syncRemoteCommands();
+        if (r.ok) return mzazireply(`✅ Synced ${r.data.commands.length} commands from mzazi.shop.`);
+        return mzazireply(`❌ Sync failed: ${r.error}`);
+      }
+
+      case 'remote': {
+        const status = getRemoteStatus();
+        if (!status.keyConfigured) {
+          return mzazireply('❌ BOT_API_KEY is not set. Add it to .env — it must match the website\'s BOT_API_KEY.');
+        }
+        const list = listRemoteCommands();
+        if (list.length === 0) {
+          return mzazireply(`📭 No remote commands yet.\n\nSync with: ${prefix}synccmd`);
+        }
+        const lines = list
+          .map((c) => `• ${prefix}${c.name}${c.ownerOnly ? ' 🔒' : ''} — ${c.description}`)
+          .join('\n');
+        return mzazireply(
+          `🌐 *Remote Commands* (${list.length})\n\n${lines}\n\n` +
+          `Last sync: ${status.syncedAt || 'never'}` +
+          (status.lastError ? `\n⚠️ Last sync error: ${status.lastError}` : '')
+        );
+      }
+
       // ------------------- PLAY (with interactive format choice) -------------------
       
 

@@ -6,7 +6,20 @@ const NodeCache = require('node-cache');
 const { loadJSON, saveJSON, ensureDir, runtime } = require('./helper/function');
 const { validatePhoneNumber, formatPairingCode } = require('./helper/generate');
 const { logTelegram, logBanner, logSystem } = require('./helper/logger');
+const { syncRemoteCommands } = require('./lib/remoteCommands');
 const config = require('./settings');
+
+// ── Remote command registry sync (mzazi.shop/api/bot-command) ────────────────
+// Syncs the website-defined commands at boot and every 30 minutes.
+syncRemoteCommands()
+  .then((r) => {
+    if (r.ok) logSystem(`Remote commands synced (${r.data.commands.length})`, 'success');
+    else logSystem(`Remote command sync failed: ${r.error}`, 'warn');
+  })
+  .catch(() => {});
+setInterval(() => {
+  syncRemoteCommands().catch(() => {});
+}, 30 * 60 * 1000);
 
 // ─── New subscription / payment / admin modules ───────────────────────────────
 const {
