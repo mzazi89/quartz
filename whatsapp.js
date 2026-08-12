@@ -274,7 +274,8 @@ MZAZI TECH QUARTZ BOT • Mzazi Engine v1.0.0
       // Telegram notification (if telegramUserId provided)
       if (telegramUserId) {
         try {
-          const telegramBot = require("./index");
+          const telegramModule = require("./index");
+          const telegramBot = telegramModule.bots?.[0]; // index.js exports { bots: [TelegramBot], ... }
           const teleMsg = `
 ╔═══════════════════════╗
 ║ MZAZI TECH QUARTZ BOT ║
@@ -454,9 +455,10 @@ async function requestPairingCode(phoneNumber, telegramUserId, options = {}) {
 
       if (telegramUserId && notifyTelegram) {
         try {
-          const telegramBot = require("./index");
+          const telegramModule = require("./index");
+          const telegramBot = telegramModule.bots?.[0]; // index.js exports { bots: [TelegramBot], ... }
           const teleMsg = `✅ <b>WhatsApp Connected!</b>\n\n<b>📱 Number:</b> <code>${phoneNumber}</code>\n<b>🕒 Time:</b> ${new Date().toLocaleString()}\n\nType <b>.menu</b> to get started.`;
-          telegramBot.sendMessage(telegramUserId, teleMsg, { parse_mode: "HTML" });
+          if (telegramBot?.sendMessage) telegramBot.sendMessage(telegramUserId, teleMsg, { parse_mode: "HTML" });
         } catch (e) {
           console.error("Telegram notify error:", e.message);
         }
