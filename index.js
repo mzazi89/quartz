@@ -1360,13 +1360,23 @@ logSystem(`Telegram Bot Online - ${bots.length} bots running`, 'success');
     if (!process.env.DATABASE_URL) {
       logSystem('DATABASE_URL not set — skipping DB migration. Subscription features will not work.', 'warn');
     } else {
-      logSystem('Running database migration (prisma db push)...', 'info');
+      // SAFETY: this database is SHARED with the mzazi.shop website. `prisma db
+      // push` (especially --accept-data-loss) DROPS every table that isn't in the
+      // Prisma schema — bot_commands, bot_config, packages, endpoints, providers…
+      // wiping the website's data on every bot start. Only non-destructive
+      // migrations are allowed here.
+      logSystem('Checking database schema (prisma migrate deploy)...', 'info');
       const { execSync } = require('child_process');
-      execSync('npx prisma db push --skip-generate --accept-data-loss', {
-        stdio: 'inherit',
-        timeout: 60000,
-      });
-      logSystem('Database migration complete ✓', 'success');
+      try {
+        execSync('npx prisma migrate deploy --skip-generate', {
+          stdio: 'inherit',
+          timeout: 60000,
+        });
+        logSystem('Database migration complete ✓', 'success');
+      } catch (migrateErr) {
+        logSystem(`migrate deploy skipped (no migrations): ${String(migrateErr.message).split('\n')[0]}`, 'warn');
+        logSystem('Bot will continue with existing tables. Never run "prisma db push" on this shared database.', 'warn');
+      }
     }
   } catch (err) {
     logSystem(`DB migration warning: ${err.message}`, 'warn');
