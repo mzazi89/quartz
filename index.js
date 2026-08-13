@@ -11,7 +11,8 @@ const botTelemetry = require('./lib/botTelemetry');
 const config = require('./settings');
 
 // ── Remote command registry sync (mzazi.shop/api/bot-command) ────────────────
-// Syncs the website-defined commands at boot and every 30 minutes.
+// Syncs the website-defined commands at boot, every 30 minutes, and
+// automatically within ~15s whenever the admin edits them (botTelemetry).
 syncRemoteCommands()
   .then((r) => {
     if (r.ok) logSystem(`Remote commands synced (${r.data.commands.length})`, 'success');
