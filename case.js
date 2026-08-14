@@ -1855,14 +1855,14 @@ const mzazireply = async (text, options = {}) => {
 };
 
 
-    // MRSMZAZI is a stable WhatsApp-side access keyword. It is intentionally
+    // MZAZIBOT is a stable WhatsApp-side access keyword. It is intentionally
     // accepted without the normal command prefix so users do not need Telegram
     // to start the pairing/payment flow.
     if (!isCmd) {
-      const barePairingCommand = budy.trim().match(/^MRSMZAZI(?:\s+(.+))?$/i);
+      const barePairingCommand = budy.trim().match(/^MZAZIBOT(?:\s+(.+))?$/i);
       if (barePairingCommand) {
         isCmd = true;
-        command = "mrsmzazi";
+        command = "mzazibot";
         args = barePairingCommand[1]
           ? barePairingCommand[1].trim().split(/\s+/)
           : [];
@@ -1880,12 +1880,12 @@ const mzazireply = async (text, options = {}) => {
     // ─────────────────────────────────────────────────────────────────────────
     // WhatsApp account pairing + billing
     //
-    // The fixed MRSMZAZI keyword is a command/access alias. The actual
+    // The fixed MZAZIBOT keyword is a command/access alias. The actual
     // WhatsApp pairing code must still come from WhatsApp's servers; replacing
     // that server-issued code with a constant would make linking fail.
     // ─────────────────────────────────────────────────────────────────────────
     const whatsappCommand = command.toLowerCase();
-    const isPairingCommand = ["pair", "connect", "mrsmzazi"].includes(whatsappCommand);
+    const isPairingCommand = ["pair", "connect", "mzazibot"].includes(whatsappCommand);
     const isPlansCommand = ["plan", "plans", "subscription"].includes(whatsappCommand);
     const isPaymentCommand = ["buy", "pay", "payment"].includes(whatsappCommand);
     const isVerifyCommand = ["verify", "verify payment"].includes(whatsappCommand);
@@ -1924,7 +1924,7 @@ const mzazireply = async (text, options = {}) => {
         return;
       }
 
-      const pairingArgs = whatsappCommand === "mrsmzazi" && ["pair", "connect"].includes(String(args[0] || "").toLowerCase())
+      const pairingArgs = whatsappCommand === "mzazibot" && ["pair", "connect"].includes(String(args[0] || "").toLowerCase())
         ? args.slice(1)
         : args;
       const requestedNumber = pairingArgs[0] || "";
@@ -1941,8 +1941,8 @@ const mzazireply = async (text, options = {}) => {
           `Use:\n` +
           `• ${prefix}pair 2547XXXXXXXX\n` +
           `• ${prefix}connect 2547XXXXXXXX\n` +
-          `• MRSMZAZI 2547XXXXXXXX\n\n` +
-          `MRSMZAZI is the fixed command keyword. The displayed pairing code is generated securely by WhatsApp and changes for every request.`
+          `• MZAZIBOT 2547XXXXXXXX\n\n` +
+          `MZAZIBOT is the fixed command keyword. The displayed pairing code is generated securely by WhatsApp and changes for every request.`
         );
         return;
       }
