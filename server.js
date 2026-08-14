@@ -38,7 +38,7 @@ function createWebhookServer() {
       const signature = req.headers['x-paystack-signature'];
       const rawBody = req.body; // Buffer because of express.raw()
 
-      if (!verifyWebhookSignature(rawBody, signature)) {
+      if (!(await verifyWebhookSignature(rawBody, signature))) {
         logSystem('Paystack webhook: invalid signature', 'error');
         return res.status(401).json({ error: 'Invalid signature' });
       }
