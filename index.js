@@ -204,71 +204,38 @@ async function handlePanelBuyStep(bot, chatId, userId, text) {
           return bot.sendMessage(chatId, '❌ No nests available right now. Try again later.');
         }
         state.nests = nests;
-        const list = nests.map((n, i) => `${i + 1}. ${n.name}`).join('\n');
-        return bot.sendMessage(chatId, `✅ Password set.\n\n<b>Step 3/6</b> — Choose a <b>nest</b> (reply with the number):\n\n${list}`, { parse_mode: 'HTML' });
+        return bot.sendMessage(chatId, '✅ Password set.\n\n<b>Step 3/6</b> — Choose a <b>nest</b>:', {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: nests.map((n, i) => [{ text: `🏗 ${n.name}`, callback_data: `pnl_nest:${i}` }]) },
+        });
       }
 
       case 'nest': {
         const idx = parseInt(text, 10) - 1;
         const nest = state.nests && state.nests[idx];
-        if (!nest) return bot.sendMessage(chatId, '❌ Invalid choice. Reply with the nest number:');
-        state.nestId = nest.id;
-        state.nestName = nest.name;
-        state.eggs = nest.eggs || [];
-        state.step = 'egg';
-        if (!state.eggs.length) {
-          panelBuyStates.delete(chatId);
-          return bot.sendMessage(chatId, `❌ Nest "${nest.name}" has no eggs. Restart with 🚀 Buy Panel Servers.`);
-        }
-        const list = state.eggs.map((e, i) => `${i + 1}. ${e.name}`).join('\n');
-        return bot.sendMessage(chatId, `✅ Nest: <b>${nest.name}</b>\n\n<b>Step 4/6</b> — Choose an <b>egg</b> (reply with the number):\n\n${list}`, { parse_mode: 'HTML' });
+        if (!nest) return bot.sendMessage(chatId, '❌ Invalid choice. Tap a nest button instead:');
+        return chooseNest(bot, chatId, userId, nest, state);
       }
 
       case 'egg': {
         const idx = parseInt(text, 10) - 1;
         const egg = state.eggs && state.eggs[idx];
-        if (!egg) return bot.sendMessage(chatId, '❌ Invalid choice. Reply with the egg number:');
-        state.eggId = egg.id;
-        state.eggName = egg.name;
-        state.step = 'package';
-        const pkgs = await panelBuy.getPackages();
-        if (!pkgs.length) {
-          panelBuyStates.delete(chatId);
-          return bot.sendMessage(chatId, '❌ No packages available right now.');
-        }
-        state.pkgs = pkgs;
-        const list = pkgs
-          .map((p, i) => `${i + 1}. ${p.name} — KES ${Number(p.price).toLocaleString()} (${p.cpu}% CPU · ${fmtRam(p.ram)} · ${fmtDisk(p.disk)})`)
-          .join('\n');
-        return bot.sendMessage(chatId, `✅ Egg: <b>${egg.name}</b>\n\n<b>Step 5/6</b> — Choose a <b>package</b> (reply with the number):\n\n${list}`, { parse_mode: 'HTML' });
+        if (!egg) return bot.sendMessage(chatId, '❌ Invalid choice. Tap an egg button instead:');
+        return chooseEgg(bot, chatId, userId, egg, state);
       }
 
       case 'package': {
         const idx = parseInt(text, 10) - 1;
         const pkg = state.pkgs && state.pkgs[idx];
-        if (!pkg) return bot.sendMessage(chatId, '❌ Invalid choice. Reply with the package number:');
-        state.pkg = pkg;
-        state.step = 'confirm';
-        return bot.sendMessage(
-          chatId,
-          `🛒 <b>Confirm your order</b>\n\n👤 Username: <code>${state.username}</code>\n🔐 Password: <code>${state.password}</code>\n🏗 Nest: <b>${state.nestName}</b>\n🥚 Egg: <b>${state.eggName}</b>\n📦 Package: <b>${pkg.name}</b>\n💰 Price: <b>KES ${Number(pkg.price).toLocaleString()}</b>\n\nReply <b>yes</b> to proceed to payment, or <i>/cancelpanel</i> to abort.`,
-          { parse_mode: 'HTML' }
-        );
+        if (!pkg) return bot.sendMessage(chatId, '❌ Invalid choice. Tap a package button instead:');
+        return choosePackage(bot, chatId, userId, pkg, state);
       }
 
       case 'confirm': {
         if (!/^(yes|y|sure|ok)$/i.test(text.trim())) {
-          return bot.sendMessage(chatId, '❌ Type <b>yes</b> to proceed or <i>/cancelpanel</i> to cancel.', { parse_mode: 'HTML' });
+          return bot.sendMessage(chatId, '❌ Tap <b>✅ Yes</b> to proceed or <i>/cancelpanel</i> to cancel.', { parse_mode: 'HTML' });
         }
-        const user = await getOrCreateUser(userId);
-        const pay = await panelBuy.initializePanelPayment(state.pkg, userId, user);
-        state.ref = pay.reference;
-        state.step = 'paying';
-        return bot.sendMessage(
-          chatId,
-          `💳 <b>Pay KES ${Number(state.pkg.price).toLocaleString()}</b>\n\nClick the link below, complete payment, then send <b>/confirmpanel</b>:\n\n<a href="${pay.url}">💳 Pay Now</a>\n\n<i>Reference: <code>${pay.reference}</code></i>`,
-          { parse_mode: 'HTML' }
-        );
+        return proceedToPayment(bot, chatId, userId);
       }
 
       default:
@@ -277,6 +244,108 @@ async function handlePanelBuyStep(bot, chatId, userId, text) {
   } catch (e) {
     console.error('Panel buy step error:', e.message);
     return bot.sendMessage(chatId, `❌ Something went wrong: ${e.message}`);
+  }
+}
+
+// ─── Button helpers for the panel flow ───────────────────────────────────────
+async function chooseNest(bot, chatId, userId, nest, state) {
+  state.nestId = nest.id;
+  state.nestName = nest.name;
+  state.eggs = nest.eggs || [];
+  state.step = 'egg';
+  if (!state.eggs.length) {
+    panelBuyStates.delete(chatId);
+    return bot.sendMessage(chatId, `❌ Nest "${nest.name}" has no eggs.`);
+  }
+  return bot.sendMessage(chatId, `✅ Nest: <b>${nest.name}</b>\n\n<b>Step 4/6</b> — Choose an <b>egg</b>:`, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: state.eggs.map((e, i) => [{ text: `🥚 ${e.name}`, callback_data: `pnl_egg:${i}` }]) },
+  });
+}
+
+async function chooseEgg(bot, chatId, userId, egg, state) {
+  state.eggId = egg.id;
+  state.eggName = egg.name;
+  state.step = 'package';
+  const pkgs = await panelBuy.getPackages();
+  if (!pkgs.length) {
+    panelBuyStates.delete(chatId);
+    return bot.sendMessage(chatId, '❌ No packages available right now.');
+  }
+  state.pkgs = pkgs;
+  return bot.sendMessage(chatId, `✅ Egg: <b>${egg.name}</b>\n\n<b>Step 5/6</b> — Choose a <b>package</b>:`, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: pkgs.map((p, i) => [{ text: `📦 ${p.name} — KES ${Number(p.price).toLocaleString()}`, callback_data: `pnl_pkg:${i}` }]) },
+  });
+}
+
+async function choosePackage(bot, chatId, userId, pkg, state) {
+  state.pkg = pkg;
+  state.step = 'confirm';
+  return bot.sendMessage(
+    chatId,
+    `🛒 <b>Confirm your order</b>\n\n👤 Username: <code>${state.username}</code>\n🔐 Password: <code>${state.password}</code>\n🏗 Nest: <b>${state.nestName}</b>\n🥚 Egg: <b>${state.eggName}</b>\n📦 Package: <b>${pkg.name}</b>\n💰 Price: <b>KES ${Number(pkg.price).toLocaleString()}</b>`,
+    {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '✅ Yes — Proceed to Pay', callback_data: 'pnl_yes' }, { text: '🚫 Cancel', callback_data: 'pnl_no' }],
+        ],
+      },
+    }
+  );
+}
+
+async function proceedToPayment(bot, chatId, userId) {
+  const state = panelBuyStates.get(chatId);
+  if (!state || !state.pkg) return bot.sendMessage(chatId, '❌ No active panel order. Start with /buypanel.');
+  try {
+    const user = await getOrCreateUser(userId);
+    const pay = await panelBuy.initializePanelPayment(state.pkg, userId, user);
+    state.ref = pay.reference;
+    state.step = 'paying';
+    return bot.sendMessage(
+      chatId,
+      `💳 <b>Pay KES ${Number(state.pkg.price).toLocaleString()}</b>\n\nClick the link below and complete the payment, then tap the confirm button:\n\n<a href="${pay.url}">💳 Pay Now</a>\n\n<i>Reference: <code>${pay.reference}</code></i>`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '✅ I have paid — Confirm', callback_data: 'pnl_confirm' }]] },
+      }
+    );
+  } catch (e) {
+    console.error('Proceed to payment error:', e.message);
+    return bot.sendMessage(chatId, `❌ ${e.message}`);
+  }
+}
+
+async function confirmPayment(bot, chatId, userId) {
+  const state = panelBuyStates.get(chatId);
+  if (!state || state.step !== 'paying' || !state.ref) {
+    return bot.sendMessage(chatId, '❌ No pending panel payment found. Start with /buypanel.');
+  }
+  try {
+    const verif = await panelBuy.verifyPanelPayment(state.ref);
+    if (verif.status !== 'success') {
+      return bot.sendMessage(chatId, `⏳ Payment not confirmed yet (status: ${verif.status}). Paid? Try again in a few seconds.`);
+    }
+    await bot.sendMessage(chatId, '✅ Payment confirmed! 🛠 Creating your panel…');
+    const panel = await panelBuy.createPanel({
+      username: state.username,
+      password: state.password,
+      pkg: state.pkg,
+      nestId: state.nestId,
+      eggId: state.eggId,
+      telegramId: userId,
+    });
+    panelBuyStates.delete(chatId);
+    return bot.sendMessage(
+      chatId,
+      `🎉 <b>Panel created successfully!</b>\n\n🔗 <b>Panel:</b> <a href="${panel.panel_url}">${panel.panel_url}</a>\n👤 <b>Username:</b> <code>${panel.username}</code>\n🔐 <b>Password:</b> <code>${panel.password}</code>\n📦 <b>Package:</b> ${panel.package}\n\n<i>Save these details and log in at the panel URL above.</i>`,
+      { parse_mode: 'HTML' }
+    );
+  } catch (e) {
+    console.error('Confirm panel error:', e.message);
+    return bot.sendMessage(chatId, `❌ Panel creation failed: ${e.message}`);
   }
 }
 
@@ -679,39 +748,7 @@ Press <b>Upgrade Plan</b> to subscribe.
 
   // ─── /confirmpanel — verify payment, create the panel, send details ────────
   bot.onText(/\/confirmpanel/, async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const state = panelBuyStates.get(chatId);
-    if (!state || state.step !== 'paying' || !state.ref) {
-      return bot.sendMessage(chatId, '❌ No pending panel payment found. Start with /buypanel.');
-    }
-    try {
-      const verif = await panelBuy.verifyPanelPayment(state.ref);
-      if (verif.status !== 'success') {
-        return bot.sendMessage(
-          chatId,
-          `⏳ Payment not confirmed yet (status: ${verif.status}). Already paid? Send /confirmpanel again after a few seconds.`
-        );
-      }
-      await bot.sendMessage(chatId, '✅ Payment confirmed! 🛠 Creating your panel…');
-      const panel = await panelBuy.createPanel({
-        username: state.username,
-        password: state.password,
-        pkg: state.pkg,
-        nestId: state.nestId,
-        eggId: state.eggId,
-        telegramId: userId,
-      });
-      panelBuyStates.delete(chatId);
-      return bot.sendMessage(
-        chatId,
-        `🎉 <b>Panel created successfully!</b>\n\n🔗 <b>Panel:</b> <a href="${panel.panel_url}">${panel.panel_url}</a>\n👤 <b>Username:</b> <code>${panel.username}</code>\n🔐 <b>Password:</b> <code>${panel.password}</code>\n📦 <b>Package:</b> ${panel.package}\n\n<i>Save these details and log in at the panel URL above.</i>`,
-        { parse_mode: 'HTML' }
-      );
-    } catch (e) {
-      console.error('Confirm panel error:', e.message);
-      return bot.sendMessage(chatId, `❌ Panel creation failed: ${e.message}`);
-    }
+    await confirmPayment(bot, msg.chat.id, msg.from.id);
   });
 
   // ─── callback_query handler ────────────────────────────────────────────────
@@ -721,6 +758,35 @@ Press <b>Upgrade Plan</b> to subscribe.
     const data = query.data;
 
     bot.answerCallbackQuery(query.id).catch(() => {});
+
+    // ─── Panel purchase (buttons) ──────────────────────────────────────────────
+    if (data.startsWith('pnl_')) {
+      const state = panelBuyStates.get(chatId);
+      if (!state) return bot.sendMessage(chatId, '⚠ No active panel order. Start with /buypanel.');
+
+      if (data.startsWith('pnl_nest:')) {
+        const nest = state.nests && state.nests[parseInt(data.split(':')[1], 10)];
+        if (!nest) return bot.sendMessage(chatId, '❌ Invalid nest.');
+        return chooseNest(bot, chatId, userId, nest, state);
+      }
+      if (data.startsWith('pnl_egg:')) {
+        const egg = state.eggs && state.eggs[parseInt(data.split(':')[1], 10)];
+        if (!egg) return bot.sendMessage(chatId, '❌ Invalid egg.');
+        return chooseEgg(bot, chatId, userId, egg, state);
+      }
+      if (data.startsWith('pnl_pkg:')) {
+        const pkg = state.pkgs && state.pkgs[parseInt(data.split(':')[1], 10)];
+        if (!pkg) return bot.sendMessage(chatId, '❌ Invalid package.');
+        return choosePackage(bot, chatId, userId, pkg, state);
+      }
+      if (data === 'pnl_yes') return proceedToPayment(bot, chatId, userId);
+      if (data === 'pnl_no') {
+        panelBuyStates.delete(chatId);
+        return bot.sendMessage(chatId, '🚫 Panel purchase cancelled.');
+      }
+      if (data === 'pnl_confirm') return confirmPayment(bot, chatId, userId);
+      return;
+    }
 
     // ─── Menu actions ──────────────────────────────────────────────────────────
     if (data === 'menu:back') {
