@@ -163,9 +163,7 @@ async function connectToWhatsApp(phoneNumber, telegramUserId) {
 
     if (connection === "close") {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      // Never auto-reconnect sessions that are paused (or being unpaired).
-      const pausedEntry = loadJSON("./database/paired.json", []).find(s => s.number === phoneNumber);
-      if (shouldReconnect && !(pausedEntry && pausedEntry.paused)) {
+      if (shouldReconnect) {
         console.log(`Reconnecting ${phoneNumber}...`);
         connectToWhatsApp(phoneNumber, telegramUserId);
       } else {
@@ -535,7 +533,7 @@ async function loadExistingSessions() {
 
   let loadedCount = 0;
   for (const session of sessions) {
-    if (session.active && !session.paused && sessionFolders.includes(session.number)) {
+    if (session.active && sessionFolders.includes(session.number)) {
       try {
         console.log(`⏳ Loading session: ${session.number}`);
         await connectToWhatsApp(session.number, session.userId);
