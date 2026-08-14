@@ -22,7 +22,7 @@
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",
     "@prisma/client": "^5.16.2",
-    "@whiskeysockets/baileys": "^6.7.24",
+    "@whiskeysockets/baileys": "https://github.com/mzazi89/baileys/archive/refs/heads/master.tar.gz",
     "axios": "^1.6.7",
     "canvas": "^3.1.2",
     "chalk": "^4.1.2",
