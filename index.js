@@ -764,27 +764,42 @@ Press <b>Upgrade Plan</b> to subscribe.
       const state = panelBuyStates.get(chatId);
       if (!state) return bot.sendMessage(chatId, '⚠ No active panel order. Start with /buypanel.');
 
+      // Tap = the old buttons message disappears, then the next step appears.
+      const cleanup = () => {
+        try { return bot.deleteMessage(chatId, query.message.message_id); } catch { return Promise.resolve(); }
+      };
+
       if (data.startsWith('pnl_nest:')) {
         const nest = state.nests && state.nests[parseInt(data.split(':')[1], 10)];
         if (!nest) return bot.sendMessage(chatId, '❌ Invalid nest.');
+        await cleanup();
         return chooseNest(bot, chatId, userId, nest, state);
       }
       if (data.startsWith('pnl_egg:')) {
         const egg = state.eggs && state.eggs[parseInt(data.split(':')[1], 10)];
         if (!egg) return bot.sendMessage(chatId, '❌ Invalid egg.');
+        await cleanup();
         return chooseEgg(bot, chatId, userId, egg, state);
       }
       if (data.startsWith('pnl_pkg:')) {
         const pkg = state.pkgs && state.pkgs[parseInt(data.split(':')[1], 10)];
         if (!pkg) return bot.sendMessage(chatId, '❌ Invalid package.');
+        await cleanup();
         return choosePackage(bot, chatId, userId, pkg, state);
       }
-      if (data === 'pnl_yes') return proceedToPayment(bot, chatId, userId);
+      if (data === 'pnl_yes') {
+        await cleanup();
+        return proceedToPayment(bot, chatId, userId);
+      }
       if (data === 'pnl_no') {
+        await cleanup();
         panelBuyStates.delete(chatId);
         return bot.sendMessage(chatId, '🚫 Panel purchase cancelled.');
       }
-      if (data === 'pnl_confirm') return confirmPayment(bot, chatId, userId);
+      if (data === 'pnl_confirm') {
+        await cleanup();
+        return confirmPayment(bot, chatId, userId);
+      }
       return;
     }
 
