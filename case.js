@@ -36,7 +36,7 @@ const os = require("os");
 const { downloadMediaMessage, generateWAMessageFromContent, proto, prepareWAMessageMedia } = require("@whiskeysockets/baileys");
 
 const pino = require("pino");
-const { sendButtons } = require("gifted-btns");
+const { sendButtonMessage } = require("./lib/buttons");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CANVAS — GROUP EVENT IMAGE GENERATOR
@@ -1680,9 +1680,9 @@ const mzazireply3 = async (caption, options = {}) => {
       message.contextInfo = { mentionedJid: mentions };
     }
 
-    // Buttons — interactive native buttons (baileys v6+/gifted-btns)
+    // Buttons — native interactive buttons (buttonReply format)
     if (buttons.length) {
-      await sendButtons(mzazi, sender, {
+      await sendButtonMessage(mzazi, sender, {
         text: caption,
         footer: options.footer || '© Bot',
         image: image ? { url: image } : undefined,
@@ -1706,7 +1706,7 @@ const mzazireply3 = async (caption, options = {}) => {
   }
 };
 const mzazireply27 = async (text) => {
-    return await sendButtons(mzazi, sender, {
+    return await sendButtonMessage(mzazi, sender, {
         text,
         footer: `© ${botName.toUpperCase()}`,
         buttons: [
@@ -1821,9 +1821,9 @@ const mzazireply = async (text, options = {}) => {
             finalFooter = `${finalFooter} | 👑 MAGGIE X KERUBO`;
         }
 
-        // ── Send (interactive buttons via gifted-btns) ──
+        // ── Send (native interactive buttons) ──
         if (buttons.length > 0) {
-            await sendButtons(mzazi, chatId, {
+            await sendButtonMessage(mzazi, chatId, {
                 text: messagePayload.caption || messagePayload.text || text,
                 footer: finalFooter,
                 image: imageBuffer ? { url: imageBuffer } : undefined,
