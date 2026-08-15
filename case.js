@@ -35,6 +35,7 @@ const os = require("os");
 const { downloadMediaMessage, generateWAMessageFromContent, proto, prepareWAMessageMedia } = require("@whiskeysockets/baileys");
 
 const pino = require("pino");
+const { sendButtons } = require("gifted-btns");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CANVAS — GROUP EVENT IMAGE GENERATOR
@@ -1678,18 +1679,21 @@ const mzazireply3 = async (caption, options = {}) => {
       message.contextInfo = { mentionedJid: mentions };
     }
 
-    // Add buttons if provided
+    // Buttons — interactive native buttons (baileys v6+/gifted-btns)
     if (buttons.length) {
-      message.buttons = buttons.map((btn) => ({
-        buttonId: btn.id || 'menu',
-        buttonText: { displayText: btn.label || 'Menu' },
-        type: 1,
-      }));
-      message.headerType = 4;
-      message.footer = options.footer || '© Bot';
+      await sendButtons(mzazi, sender, {
+        text: caption,
+        footer: options.footer || '© Bot',
+        image: image ? { url: image } : undefined,
+        buttons: buttons.map((btn) => ({
+          id: btn.id || 'menu',
+          text: btn.label || 'Menu',
+        })),
+      });
+      return;
     }
 
-    // Send
+    // Send (no buttons)
     await mzazi.sendMessage(sender, message);
 
   } catch (err) {
@@ -1701,32 +1705,15 @@ const mzazireply3 = async (caption, options = {}) => {
   }
 };
 const mzazireply27 = async (text) => {
-    return await mzazi.sendMessage(
-        sender,
-        {
-            text,
-            footer: "© ${botName.toUpperCase()}",
-            buttons: [
-                {
-                    buttonId: ".menu",
-                    buttonText: { displayText: "📜 MENU" },
-                    type: 1
-                },
-                {
-                    buttonId: ".owner",
-                    buttonText: { displayText: "👑 OWNER" },
-                    type: 1
-                },
-                {
-                    buttonId: ".alive",
-                    buttonText: { displayText: "🤖 STATUS" },
-                    type: 1
-                }
-            ],
-            headerType: 1
-        },
-        { quoted: m }
-    );
+    return await sendButtons(mzazi, sender, {
+        text,
+        footer: `© ${botName.toUpperCase()}`,
+        buttons: [
+            { id: ".menu", text: "📜 MENU" },
+            { id: ".owner", text: "👑 OWNER" },
+            { id: ".alive", text: "🤖 STATUS" }
+        ]
+    });
 };
 
 const mzazireply = async (text, options = {}) => {
@@ -1827,19 +1814,26 @@ const mzazireply = async (text, options = {}) => {
         // ── Use custom buttons if provided, else default ──
         const buttons = customButtons || defaultButtons;
 
-        // ── Add buttons if provided ──
-        if (buttons.length > 0) {
-            messagePayload.buttons = buttons;
-            messagePayload.headerType = 4;
-            messagePayload.footer = footer;
-        }
-
         // ── Add owner name to footer if not set ──
-        if (!footer.includes('MAGGIE X KERUBO')) {
-            messagePayload.footer = `${footer} | 👑 MAGGIE X KERUBO`;
+        let finalFooter = footer;
+        if (!finalFooter.includes('MAGGIE X KERUBO')) {
+            finalFooter = `${finalFooter} | 👑 MAGGIE X KERUBO`;
         }
 
-        // ── Send ──
+        // ── Send (interactive buttons via gifted-btns) ──
+        if (buttons.length > 0) {
+            await sendButtons(mzazi, chatId, {
+                text: messagePayload.caption || messagePayload.text || text,
+                footer: finalFooter,
+                image: imageBuffer ? { url: imageBuffer } : undefined,
+                buttons: buttons.map((b) => ({
+                    id: b.buttonId || b.id || `${prefix}menu`,
+                    text: b.buttonText?.displayText || b.text || 'Menu',
+                })),
+            });
+            return;
+        }
+
         await mzazi.sendMessage(chatId, messagePayload);
 
     } catch (err) {
