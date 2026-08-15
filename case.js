@@ -18,6 +18,7 @@ const logger = require("./helper/logger.js");
 const { logSystem } = require('./helper/logger.js'); // Adjust path as needed
 const { logIncomingMessage, logGroupCommand } = require("./lib/chatLogger");
 const { syncRemoteCommands, getRemoteCommand, listRemoteCommands, runRemoteCommand, getRemoteStatus } = require("./lib/remoteCommands.js");
+const { getMzaziApiKey, getSetting } = require("./lib/settings");
 const { db, saveDB } = require("./lib/database");
 const {
   PAIRING_COMMAND,
@@ -2966,6 +2967,8 @@ const mzazireply = async (text, options = {}) => {
       requests3: undefined,
       requests4: undefined,
       require,
+      getMzaziApiKey,
+      getSetting,
       res: undefined,
       resetWarn,
       resolve: undefined,
