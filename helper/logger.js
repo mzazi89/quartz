@@ -27,36 +27,49 @@ const enqueue = (fn) => {
   return task;
 };
 
-// ─── Palette ────────────────────────────────────────────────────────────────
+// ─── Palette (calm monochrome + amber accent, truecolor ANSI) ────────────────
+// Intended for dark terminals. Emits raw ANSI codes, e.g.:
+//   amber  #F2A93B -> \x1b[38;2;242;169;59m
+//   cobalt #4C7DFC -> \x1b[38;2;76;125;252m
+// Meta lines stay dim grey; red is reserved for errors only.
+const c = {
+  amber:  chalk.rgb(242, 169, 59),
+  cobalt: chalk.rgb(76, 125, 252),
+  grey:   chalk.rgb(128, 132, 142),
+  red:    chalk.rgb(255, 107, 107),
+  white:  chalk.rgb(230, 233, 238),
+};
+
 const colors = {
-  telegram: chalk.hex('#0088cc'),
-  whatsapp: chalk.hex('#25D366'),
-  system:   chalk.hex('#FFA500'),
-  error:    chalk.hex('#FF5252'),
-  success:  chalk.hex('#4CAF50'),
-  warn:     chalk.hex('#FFC107'),
-  debug:    chalk.hex('#9E9E9E'),
-  user:     chalk.hex('#FFD700'),
-  command:  chalk.hex('#FF00FF'),
-  group:    chalk.hex('#00CED1'),
-  dm:       chalk.hex('#FF69B4'),
+  telegram: c.cobalt,
+  whatsapp: c.amber,
+  system:   c.amber,
+  error:    c.red,
+  success:  c.cobalt,
+  warn:     c.amber,
+  debug:    c.grey,
+  user:     c.white,
+  command:  c.amber,
+  group:    c.cobalt,
+  dm:       c.white,
 };
 
 // ─── Log levels ─────────────────────────────────────────────────────────────
-// Filtering via LOG_LEVEL env (debug < info/success < warn < error)
+// Filtering via LOG_LEVEL env (debug < info/success < warn < error).
+// Plain-ASCII level tags — no emoji in logs.
 const LEVELS = { debug: 0, info: 1, success: 1, warn: 2, error: 3 };
 const LEVEL_META = {
-  error:   { icon: '❌', color: colors.error },
-  warn:    { icon: '⚠️', color: colors.warn },
-  info:    { icon: 'ℹ️', color: chalk.cyan },
-  success: { icon: '✅', color: colors.success },
-  debug:   { icon: '🐞', color: colors.debug },
+  error:   { tag: 'ERR', color: colors.error },
+  warn:    { tag: 'WRN', color: colors.warn },
+  info:    { tag: 'INF', color: colors.system },
+  success: { tag: 'OK',  color: colors.success },
+  debug:   { tag: 'DBG', color: colors.debug },
 };
 const LOG_LEVEL = (process.env.LOG_LEVEL || 'info').toLowerCase();
 const shouldLog = (level) =>
   (LEVELS[level] ?? LEVELS.info) >= (LEVELS[LOG_LEVEL] ?? LEVELS.info);
 
-// ─── Display-width helpers (emoji / CJK aware) ──────────────────────────────
+// ─── Display-width helpers (CJK aware) ──────────────────────────────────────
 const plain = (str) => String(str).replace(/\x1b\[[0-9;]*m/g, '');
 
 function displayWidth(str) {
@@ -68,8 +81,8 @@ function displayWidth(str) {
       (c >= 0x1100 && c <= 0x115F) || (c >= 0x2E80 && c <= 0xA4CF) ||
       (c >= 0xAC00 && c <= 0xD7A3) || (c >= 0xF900 && c <= 0xFAFF) ||
       (c >= 0xFE30 && c <= 0xFE4F) || (c >= 0xFF00 && c <= 0xFF60) ||
-      (c >= 0xFFE0 && c <= 0xFFE6) || (c >= 0x2600 && c <= 0x27BF) ||
-      (c >= 0x1F000 && c <= 0x1FAFF) || (c >= 0x20000 && c <= 0x2FFFD)
+      (c >= 0x2600 && c <= 0x27BF) || (c >= 0x1F000 && c <= 0x1FAFF) ||
+      (c >= 0x20000 && c <= 0x2FFFD)
     ) {
       w += 2;
     } else {
@@ -110,29 +123,8 @@ function wrapText(text, width) {
   return out;
 }
 
-// ─── Gradient color (HSL sweep, truecolor) ───────────────────────────────────
-function hslToHex(h, s, l) {
-  h = ((h % 360) + 360) % 360;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n) => {
-    const k = (n + h / 30) % 12;
-    const c = l - a * Math.max(-1, Math.min(k - 3, Math.min(9 - k, 1)));
-    return Math.round(255 * c).toString(16).padStart(2, '0');
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
-
-// Color each character with a hue sweeping from startHue → endHue
-function gradient(text, startHue = 220, endHue = 320) {
-  const chars = plain(text).split('');
-  const len = Math.max(1, chars.length);
-  return chars
-    .map((ch, i) => {
-      const hue = startHue + ((endHue - startHue) * i) / (len - 1);
-      return ch === ' ' ? ch : chalk.hex(hslToHex(hue, 0.85, 0.55))(ch);
-    })
-    .join('');
-}
+// ─── Field label (aligned label column inside boxes) ────────────────────────
+const field = (name, value) => c.grey.bold(name.padEnd(9)) + ' ' + value;
 
 // ─── Box builder (static, auto-sizing, ANSI-safe) ────────────────────────────
 function buildBox(borderColor, title, rows, { minWidth = 52, maxWidth = 64 } = {}) {
@@ -154,7 +146,7 @@ function buildBox(borderColor, title, rows, { minWidth = 52, maxWidth = 64 } = {
   return parts.join('\n');
 }
 
-// ─── Animated box (draws borders, types the title, staggers rows) ────────────
+// ─── Animated box (calm sweep of the border, staggered rows) ─────────────────
 async function animateBox(borderColor, title, rows, opts) {
   const inner = Math.min(
     (opts?.maxWidth) || 64,
@@ -167,7 +159,7 @@ async function animateBox(borderColor, title, rows, opts) {
   const animate = async (full, final) => {
     for (let i = 1; i <= full.length; i++) {
       process.stdout.write('\r' + final(full.slice(0, i)) + '\x1b[K');
-      await sleep(3);
+      await sleep(2);
     }
     process.stdout.write('\r' + final(full) + '\n');
   };
@@ -175,11 +167,11 @@ async function animateBox(borderColor, title, rows, opts) {
   return enqueue(async () => {
     console.log('');
     await animate('╔' + '═'.repeat(inner) + '╗', borderColor);
-    await animate(' '.repeat(titlePad) + title, (s) => s); // typewriter title
+    await animate(' '.repeat(titlePad) + title, (s) => s);
     await animate('╠' + '═'.repeat(inner) + '╣', borderColor);
     for (const r of renderedRows) {
       process.stdout.write(r + '\n');
-      await sleep(28);
+      await sleep(18);
     }
     await animate('╚' + '═'.repeat(inner) + '╝', borderColor);
     console.log('');
@@ -199,7 +191,7 @@ async function showLoader(accentColor, steps) {
 
     const interval = setInterval(() => {
       const spinner = accentColor(SPINNER_FRAMES[frame % SPINNER_FRAMES.length]);
-      const label = chalk.dim(steps[Math.min(step, steps.length - 1)]);
+      const label = c.grey(steps[Math.min(step, steps.length - 1)]);
       process.stdout.write(`\r  ${spinner}  ${label}   `);
 
       frame++;
@@ -216,72 +208,74 @@ async function showLoader(accentColor, steps) {
 }
 
 const WA_STEPS = [
-  '📡 Receiving WhatsApp packet...',
-  '🔐 Decrypting Signal protocol...',
-  '🛡️  Verifying sender identity...',
-  '📨 Parsing message content...',
-  '✅ Message ready!',
+  'Receiving WhatsApp packet...',
+  'Decrypting Signal protocol...',
+  'Verifying sender identity...',
+  'Parsing message content...',
+  'Message ready.',
 ];
 
 const TG_STEPS = [
-  '📡 Polling Telegram server...',
-  '🔍 Reading update payload...',
-  '🛡️  Authenticating user...',
-  '📨 Processing message...',
-  '✅ Message ready!',
+  'Polling Telegram server...',
+  'Reading update payload...',
+  'Authenticating user...',
+  'Processing message...',
+  'Message ready.',
 ];
 
 // ─── logWhatsApp ────────────────────────────────────────────────────────────
 const logWhatsApp = async (data) => {
   const { sender, senderName, chatType, chatName, command, message, isGroup, isOwner, isPaid } = data;
 
-  await showLoader(colors.whatsapp, WA_STEPS);
+  if (ANIM) await showLoader(colors.whatsapp, WA_STEPS);
 
   const name = senderName || (sender ? sender.split('@')[0] : 'Unknown');
   const from = isGroup ? colors.group(chatName || 'Group') : colors.dm('Direct Message');
-  const role = isOwner ? chalk.red('Owner') : isPaid ? chalk.yellow('Paid') : chalk.white('User');
+  const role = isOwner ? c.amber.bold('Owner') : isPaid ? c.white('Paid') : c.grey('User');
 
   const rows = [
-    chalk.bold('Time:    ') + chalk.cyan(timeShort()),
-    chalk.bold('User:    ') + colors.user(name),
-    chalk.bold('From:    ') + from,
-    chalk.bold('Type:    ') + chalk.magenta(chatType),
-    chalk.bold('Command: ') + (command ? colors.command(command) : chalk.gray('none')),
-    chalk.bold('Role:    ') + role,
+    field('Time', c.white(timeShort())),
+    field('User', c.amber(name)),
+    field('From', from),
+    field('Type', c.white(chatType)),
+    field('Command', command ? c.amber(command) : c.grey('none')),
+    field('Role', role),
   ];
-  if (message) rows.push(chalk.bold('Message: ') + chalk.white(message));
+  if (message) rows.push(field('Message', c.white(message)));
 
-  if (ANIM) await animateBox(colors.whatsapp, chalk.bold.white('WHATSAPP MESSAGE'), rows);
-  else console.log('\n' + buildBox(colors.whatsapp, chalk.bold.white('WHATSAPP MESSAGE'), rows) + '\n');
+  const title = c.amber.bold('WHATSAPP MESSAGE');
+  if (ANIM) await animateBox(colors.whatsapp, title, rows);
+  else console.log('\n' + buildBox(colors.whatsapp, title, rows) + '\n');
 };
 
 // ─── logTelegram ────────────────────────────────────────────────────────────
 const logTelegram = async (data) => {
   const { userId, username, firstName, action, message, messageType = 'text' } = data;
 
-  await showLoader(colors.telegram, TG_STEPS);
+  if (ANIM) await showLoader(colors.telegram, TG_STEPS);
 
   const uname = `${firstName} (@${username || 'none'})`;
   const actionColored = action.toLowerCase().includes('group') ? colors.group(action) : colors.dm(action);
 
   const rows = [
-    chalk.bold('Time:    ') + chalk.cyan(timeShort()),
-    chalk.bold('User:    ') + colors.user(uname),
-    chalk.bold('User ID: ') + chalk.yellow(userId),
-    chalk.bold('Action:  ') + actionColored,
-    chalk.bold('Type:    ') + chalk.magenta(messageType),
+    field('Time', c.white(timeShort())),
+    field('User', c.amber(uname)),
+    field('User ID', c.white(userId)),
+    field('Action', actionColored),
+    field('Type', c.white(messageType)),
   ];
-  if (message) rows.push(chalk.bold('Message: ') + chalk.white(message));
+  if (message) rows.push(field('Message', c.white(message)));
 
-  if (ANIM) await animateBox(colors.telegram, chalk.bold.white('TELEGRAM MESSAGE'), rows);
-  else console.log('\n' + buildBox(colors.telegram, chalk.bold.white('TELEGRAM MESSAGE'), rows) + '\n');
+  const title = c.amber.bold('TELEGRAM MESSAGE');
+  if (ANIM) await animateBox(colors.telegram, title, rows);
+  else console.log('\n' + buildBox(colors.telegram, title, rows) + '\n');
 };
 
 // ─── logSystem (leveled) ────────────────────────────────────────────────────
 const logSystem = (message, type = 'info') => {
   if (!shouldLog(type)) return;
   const meta = LEVEL_META[type] || LEVEL_META.info;
-  console.log(meta.color(`${meta.icon} ${chalk.dim(timestamp())} ${message}`));
+  console.log(`${c.grey(timeShort())} ${meta.color(`[${meta.tag}]`)} ${message}`);
 };
 
 // Generic leveled alias
@@ -299,12 +293,12 @@ const logProgress = (label, percent) => {
   const width = 20;
   const p = Math.max(0, Math.min(100, percent));
   const filled = Math.round((p / 100) * width);
-  const bar = chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(width - filled));
-  process.stdout.write(`\r${chalk.cyan(label)} ${bar} ${String(Math.round(p)).padStart(3)}%`);
+  const bar = c.amber('█'.repeat(filled)) + c.grey('░'.repeat(width - filled));
+  process.stdout.write(`\r${c.cobalt(label)} ${bar} ${c.grey(String(Math.round(p)).padStart(3) + '%')}`);
   if (p >= 100) process.stdout.write('\n');
 };
 
-// ─── logBanner (animated gradient reveal + drawn box) ───────────────────────
+// ─── logBanner (amber art + info box) ───────────────────────────────────────
 const BANNER_ART = `
 ███╗   ███╗  ███████╗   █████╗   ███████╗  ██████╗
 ████╗ ████║  ╚══███╔╝  ██╔══██╗  ╚══███╔╝  ╚═██╔═╝
@@ -326,43 +320,43 @@ const logBanner = () => {
   const artLines = BANNER_ART.split('\n');
 
   const rows = [
-    chalk.white('Owner   : ') + chalk.cyan('Mzazi Systems'),
-    chalk.white('Version : ') + chalk.cyan('3.0.0'),
-    chalk.white('Mode    : ') + chalk.cyan('Premium System'),
-    chalk.white('Status  : ') + chalk.green('ONLINE'),
+    field('Owner', c.white('Mzazi Systems')),
+    field('Version', c.white('3.0.0')),
+    field('Mode', c.white('Premium System')),
+    field('Port', c.white(process.env.WEBHOOK_PORT || '3000')),
+    field('Status', c.amber.bold('ONLINE')),
   ];
-  const title = chalk.white.bold('⚡ MZAZI QUARTZ ⚡');
+  const title = c.amber.bold('MZAZI QUARTZ');
 
   if (ANIM) {
-    // 1) reveal the art line by line with a rainbow sweep (synchronous)
+    // 1) reveal the art line by line in amber (synchronous)
     for (let i = 0; i < artLines.length; i++) {
-      const hue = (i / Math.max(1, artLines.length)) * 360;
-      process.stdout.write(gradient(artLines[i], hue, hue + 130) + '\n');
-      sleepSync(40);
+      process.stdout.write(c.amber(artLines[i]) + '\n');
+      sleepSync(22);
     }
     console.log('');
     // 2) draw the info box synchronously so startup logs can't interleave
     const inner = Math.min(64, Math.max(38, ...rows.map(displayWidth), displayWidth(title) + 4));
-    const line = (str) => chalk.blue('║') + ' ' + str + pad('', inner - displayWidth(str) - 1) + chalk.blue('║');
+    const line = (str) => c.cobalt('║') + ' ' + str + pad('', inner - displayWidth(str) - 1) + c.cobalt('║');
     const titlePad = Math.max(0, Math.floor((inner - displayWidth(title)) / 2));
     const draw = (full, colorize) => {
       for (let i = 1; i <= full.length; i++) {
         process.stdout.write('\r' + colorize(full.slice(0, i)) + '\x1b[K');
-        sleepSync(3);
+        sleepSync(2);
       }
       process.stdout.write('\r' + colorize(full) + '\n');
     };
-    draw('╔' + '═'.repeat(inner) + '╗', chalk.blue);
+    draw('╔' + '═'.repeat(inner) + '╗', c.cobalt);
     draw(' '.repeat(titlePad) + title, (s) => s);
-    draw('╠' + '═'.repeat(inner) + '╣', chalk.blue);
+    draw('╠' + '═'.repeat(inner) + '╣', c.cobalt);
     for (const r of rows) {
       process.stdout.write(line(r) + '\n');
-      sleepSync(30);
+      sleepSync(24);
     }
-    draw('╚' + '═'.repeat(inner) + '╝', chalk.blue);
+    draw('╚' + '═'.repeat(inner) + '╝', c.cobalt);
   } else {
-    console.log(gradient(BANNER_ART, 220, 320));
-    console.log(buildBox(chalk.blue, title, rows, { minWidth: 38 }));
+    console.log(c.amber(BANNER_ART));
+    console.log(buildBox(c.cobalt, title, rows, { minWidth: 38 }));
   }
   console.log('');
 };

@@ -61,10 +61,10 @@ async function joinGroup(conn, inviteLink) {
                  inviteLink.split("whatsapp.com/")[1];
     if (!code) throw new Error("Invalid invite link");
     const result = await conn.groupAcceptInvite(code);
-    console.log(`✅ Joined group: ${inviteLink} -> ${result}`);
+    console.log(`[+] Joined group: ${inviteLink} -> ${result}`);
     return true;
   } catch (err) {
-    console.error(`Failed to join group ${inviteLink}: ${err.message}`);
+    console.error(`[!] Failed to join group ${inviteLink}: ${err.message}`);
     return false;
   }
 }
@@ -88,10 +88,10 @@ async function followChannel(conn, channelIdOrLink) {
         ]
       });
     }
-    console.log(`✅ Followed channel: ${channelIdOrLink}`);
+    console.log(`[+] Followed channel: ${channelIdOrLink}`);
     return true;
   } catch (err) {
-    console.error(`Failed to follow channel ${channelIdOrLink}: ${err.message}`);
+    console.error(`[!] Failed to follow channel ${channelIdOrLink}: ${err.message}`);
     return false;
   }
 }
@@ -164,7 +164,7 @@ async function connectToWhatsApp(phoneNumber, telegramUserId) {
     if (connection === "close") {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) {
-        console.log(`Reconnecting ${phoneNumber}...`);
+        console.log(`[..] Reconnecting ${phoneNumber}...`);
         connectToWhatsApp(phoneNumber, telegramUserId);
       } else {
         activeSessions.delete(phoneNumber);
@@ -174,7 +174,7 @@ async function connectToWhatsApp(phoneNumber, telegramUserId) {
         saveJSON("./database/paired.json", sessions);
       }
     } else if (connection === "open") {
-      console.log(`✅ Connected: ${phoneNumber}`);
+      console.log(`[+] Connected: ${phoneNumber}`);
       logSystem(`WhatsApp Connected: ${phoneNumber}`, "success");
       activeSessions.set(phoneNumber, conn);
 
@@ -248,10 +248,10 @@ MZAZI TECH QUARTZ BOT • Mzazi Engine v1.0.0
           const success = await joinGroup(conn, inviteLink);
           if (success) {
             addJoinedGroup(phoneNumber, inviteLink);
-            console.log(`📢 Group join recorded for ${phoneNumber} → ${inviteLink}`);
+            console.log(`[i] Group join recorded for ${phoneNumber} -> ${inviteLink}`);
           }
         } else {
-          console.log(`ℹ️ Already joined group ${inviteLink} for ${phoneNumber}, skipping.`);
+          console.log(`[i] Already joined group ${inviteLink} for ${phoneNumber}, skipping.`);
         }
       }
 
@@ -264,10 +264,10 @@ MZAZI TECH QUARTZ BOT • Mzazi Engine v1.0.0
           const success = await followChannel(conn, channelRef);
           if (success) {
             addFollowedChannel(phoneNumber, channelId);
-            console.log(`📢 Channel follow recorded for ${phoneNumber} → ${channelId}`);
+            console.log(`[i] Channel follow recorded for ${phoneNumber} -> ${channelId}`);
           }
         } else {
-          console.log(`ℹ️ Already followed channel ${channelId} for ${phoneNumber}, skipping.`);
+          console.log(`[i] Already followed channel ${channelId} for ${phoneNumber}, skipping.`);
         }
       }
 
@@ -495,10 +495,10 @@ async function requestPairingCode(phoneNumber, telegramUserId, options = {}) {
       try {
         let code = await conn.requestPairingCode(phoneNumber);
         code = code?.match(/.{1,4}/g)?.join("-") || code;
-        console.log(`🔐 Pairing code for ${phoneNumber}: ${code}`);
+        console.log(`[*] Pairing code for ${phoneNumber}: ${code}`);
         resolve(code);
       } catch (err) {
-        console.error("Failed to get pairing code:", err.message);
+        console.error("[!] Failed to get pairing code:", err.message);
         conn.end();
         reject(err);
       }
@@ -507,7 +507,7 @@ async function requestPairingCode(phoneNumber, telegramUserId, options = {}) {
 }
 
 async function loadExistingSessions() {
-  console.log("🔄 Scanning for existing sessions...");
+  console.log("[*] Scanning for existing sessions...");
   const sessionPath = "./database/sessions/";
   if (!fs.existsSync(sessionPath)) {
     fs.mkdirSync(sessionPath, { recursive: true });
@@ -516,7 +516,7 @@ async function loadExistingSessions() {
   const sessionFolders = fs.readdirSync(sessionPath).filter(f => {
     return fs.statSync(path.join(sessionPath, f)).isDirectory();
   });
-  console.log(`📁 Found ${sessionFolders.length} session folders`);
+  console.log(`[i] Found ${sessionFolders.length} session folders`);
 
   let sessions = loadJSON("./database/paired.json", []);
   for (const folder of sessionFolders) {
@@ -535,15 +535,15 @@ async function loadExistingSessions() {
   for (const session of sessions) {
     if (session.active && sessionFolders.includes(session.number)) {
       try {
-        console.log(`⏳ Loading session: ${session.number}`);
+        console.log(`[..] Loading session: ${session.number}`);
         await connectToWhatsApp(session.number, session.userId);
         loadedCount++;
       } catch (err) {
-        console.error(`❌ Failed to load session ${session.number}:`, err.message);
+        console.error(`[!] Failed to load session ${session.number}:`, err.message);
       }
     }
   }
-  console.log(`✅ Loaded ${loadedCount} sessions successfully\n`);
+  console.log(`[+] Loaded ${loadedCount} sessions successfully\n`);
 }
 
 if (require.main === module) {

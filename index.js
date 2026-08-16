@@ -93,34 +93,34 @@ const bots = tokens.map((token, index) => {
       polling: true,
     });
 
-    console.log(`✅ Bot ${index + 1} started: ${token.split(":")[0]}`);
+    console.log(`[+] Bot ${index + 1} started: ${token.split(":")[0]}`);
 
     // Error handling per bot
     bot.on('error', (error) => {
-      console.error(`❌ Bot ${index + 1} error:`, error.message);
+      console.error(`[!] Bot ${index + 1} error:`, error.message);
       logSystem(`Bot ${index + 1} error: ${error.message}`, 'error');
     });
 
     bot.on('polling_error', (error) => {
-      console.error(`❌ Bot ${index + 1} polling error:`, error.message);
+      console.error(`[!] Bot ${index + 1} polling error:`, error.message);
       logSystem(`Bot ${index + 1} polling error: ${error.message}`, 'error');
     });
 
     return bot;
   } catch (error) {
-    console.error(`❌ Failed to start bot ${index + 1}:`, error.message);
+    console.error(`[!] Failed to start bot ${index + 1}:`, error.message);
     logSystem(`Failed to start bot ${index + 1}: ${error.message}`, 'error');
     return null;
   }
 }).filter(bot => bot !== null);
 
 if (bots.length === 0) {
-  console.error("❌ No bots started successfully!");
+  console.error("[!] No bots started successfully!");
   logSystem("No bots started successfully!", 'error');
   process.exit(1);
 }
 
-console.log(`✅ ${bots.length} bots running with shared state`);
+console.log(`[+] ${bots.length} bots running with shared state`);
 logSystem(`${bots.length} bots online with shared state`, 'success');
 
 // ─── Owner helpers (preserved) ───────────────────────────────────────────────
@@ -1593,7 +1593,7 @@ Valid for 1 hour.
     bot.sendMessage(chatId, helpText, { parse_mode: 'HTML' });
   });
 
-  console.log(`✅ Bot ${botIndex + 1} handlers setup complete`);
+  console.log(`[+] Bot ${botIndex + 1} handlers setup complete`);
 }
 
 // ─── APPLY HANDLERS TO ALL BOTS ─────────────────────────────────────────────
@@ -1623,7 +1623,7 @@ logSystem(`Telegram Bot Online - ${bots.length} bots running`, 'success');
           stdio: 'inherit',
           timeout: 60000,
         });
-        logSystem('Database migration complete ✓', 'success');
+        logSystem('Database migration complete', 'success');
       } catch (migrateErr) {
         logSystem(`migrate deploy skipped (no migrations): ${String(migrateErr.message).split('\n')[0]}`, 'warn');
         logSystem('Bot will continue with existing tables. Never run "prisma db push" on this shared database.', 'warn');
