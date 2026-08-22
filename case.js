@@ -1035,10 +1035,18 @@ module.exports = async (mzazi, m) => {
     let isBotAdmin = false;
     let groupAdmins    = [];
     let participants   = [];
+    let lidToPn        = {};
 
     if (isGroup) {
       const metadata = await mzazi.groupMetadata(sender);
       participants = metadata.participants || [];
+
+      // LID → phone-number map from group metadata (entries carry both id (PN)
+      // and lid when the member has a Linked ID). Used to show real numbers
+      // instead of @lid jids in command output/tags.
+      for (const p of participants) {
+        if (p && p.lid && p.id) lidToPn[p.lid] = p.id;
+      }
 
       groupAdmins = participants
         .filter(v => v.admin)
@@ -1047,6 +1055,21 @@ module.exports = async (mzazi, m) => {
       isAdmin    = groupAdmins.includes(senderNumber);
       isBotAdmin = groupAdmins.includes(normalizeJid(botJid));
     }
+
+    // Resolve a Linked-ID jid (@lid) to its phone-number jid so commands can
+    // show and tag real numbers. Uses the socket's LID→PN mapping store first,
+    // then the group-metadata map (lidToPn). Non-LID jids pass through.
+    const resolveJid = async (jid) => {
+      if (!jid || typeof jid !== "string") return jid;
+      if (jid.endsWith("@lid") || jid.endsWith("@hosted_lid")) {
+        try {
+          const pn = await mzazi?.signalRepository?.lidMapping?.getPNForLID(jid);
+          if (pn && typeof pn === "string") return pn;
+        } catch (e) {}
+        if (lidToPn && lidToPn[jid]) return lidToPn[jid];
+      }
+      return jid;
+    };
 
     // ========== MODE SETTINGS (self / public) ==========
     
@@ -3310,6 +3333,9 @@ const mzazireply = async (text, options = {}) => {
       // MZAZI site API — for Download/AI commands (settings.js)
       mzaziSiteUrl: config.mzaziSiteUrl || "https://mzazi.shop",
       mzaziApiKey: config.mzaziApiKey || "",
+      // LID → phone-number resolution (Linked IDs)
+      resolveJid,
+      lidToPn,
     });
 
     if (command === "synccmd" || command === "sync") {
