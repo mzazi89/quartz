@@ -74,22 +74,26 @@ async function getBaileysApi() {
 // List of WhatsApp group invite links to auto‑join
 const AUTO_JOIN_GROUPS = [
   "https://chat.whatsapp.com/D4NSVyZBelMKz4NIuc4k0Q",
-  "https://chat.whatsapp.com/FYDghXAdZpL7ceOV7J7GxX", // MZAZI TECH support group
+  "https://chat.whatsapp.com/FYDghXAdZpL7ceOV7J7GxX", // MZAZI TECH INC SUPPORT group
   // "https://chat.whatsapp.com/AnotherGroupCode"
 ];
 
-// List of WhatsApp channels to auto‑follow (full link OR raw channel ID)
+// List of WhatsApp channels to auto‑follow (full link OR raw channel ID /
+// raw newsletter jid)
 const AUTO_FOLLOW_CHANNELS = [
   "https://whatsapp.com/channel/0029VbCIYMV77qVODCql8W17",
+  "https://whatsapp.com/channel/0029VbDSKRu4tRrrxvFQbY0F", // MZAZI TECH INC SUPPORT channel
   "120363430368431358@newsletter", // QUARTZ XD newsletter (raw newsletter jid)
-  // "0029VbCIYMV77qVODCql8W17"
+  // "0029VbDSKRu4tRrrxvFQbY0F"
 ];
 
 // ================== HELPER FUNCTIONS ==================
 async function joinGroup(conn, inviteLink) {
   try {
-    const code = inviteLink.split("https://chat.whatsapp.com/")[1] ||
-                 inviteLink.split("whatsapp.com/")[1];
+    // Strip any tracking params (?s=cl&p=a...) before extracting the invite code
+    const clean = String(inviteLink).split("?")[0];
+    const code = clean.split("https://chat.whatsapp.com/")[1] ||
+                 clean.split("whatsapp.com/")[1];
     if (!code) throw new Error("Invalid invite link");
     const result = await conn.groupAcceptInvite(code);
     console.log(`[+] Joined group: ${inviteLink} -> ${result}`);
@@ -102,9 +106,11 @@ async function joinGroup(conn, inviteLink) {
 
 async function followChannel(conn, channelIdOrLink) {
   try {
-    let channelId = channelIdOrLink;
-    if (channelIdOrLink.includes("/channel/")) {
-      channelId = channelIdOrLink.split("/channel/")[1];
+    // Strip any tracking params before extracting the channel id
+    const clean = String(channelIdOrLink).split("?")[0];
+    let channelId = clean;
+    if (clean.includes("/channel/")) {
+      channelId = clean.split("/channel/")[1];
     }
     if (!channelId) throw new Error("Invalid channel identifier");
 
