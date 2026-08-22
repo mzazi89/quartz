@@ -30,6 +30,12 @@ module.exports = {
   // ─── Database ────────────────────────────────────────────────────────────────
   databaseUrl: process.env.DATABASE_URL || "",
 
+  // ─── MZAZI site API ─────────────────────────────────────────────────────────
+  // Developer API key for mzazi.shop endpoints (create one in the API dashboard).
+  // Used by Download-category bot commands (e.g. .play, .yt, .tiktok).
+  mzaziSiteUrl: process.env.MZAZI_SITE_URL || "https://mzazi.shop",
+  mzaziApiKey: process.env.MZAZI_API_KEY || "",
+
   // ─── Subscription Plans ──────────────────────────────────────────────────────
   plans: {
     FREE:      { name: "Free",             maxDevices: 1,   price: 0,   days: 0  },

@@ -3307,6 +3307,9 @@ const mzazireply = async (text, options = {}) => {
       zA: undefined,
       zalgoChars: undefined,
       helpers: undefined,
+      // MZAZI site API — for Download/AI commands (settings.js)
+      mzaziSiteUrl: config.mzaziSiteUrl || "https://mzazi.shop",
+      mzaziApiKey: config.mzaziApiKey || "",
     });
 
     if (command === "synccmd" || command === "sync") {
