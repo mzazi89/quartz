@@ -13,6 +13,35 @@ const config = require("./settings");
 const msgRetryCounterCache = new NodeCache();
 const activeSessions = new Map();
 
+// Per-session telemetry (online / battery / charging / lastSeen) reported to
+// the website through bot_status.devices_meta. Battery + plugged are captured
+// defensively from connection.update — if the Baileys build ever delivers them
+// (update.battery / update.plugged) they are recorded automatically.
+const sessionTelemetry = new Map();
+
+function updateSessionTelemetry(phoneNumber, update) {
+  const prev = sessionTelemetry.get(phoneNumber) || {};
+  const battery =
+    typeof update.battery === "number"
+      ? update.battery
+      : update.battery && typeof update.battery.level === "number"
+      ? update.battery.level
+      : prev.battery;
+  const plugged =
+    typeof update.plugged === "boolean" ? update.plugged : prev.plugged;
+  sessionTelemetry.set(phoneNumber, {
+    online:
+      update.connection === "open"
+        ? true
+        : update.connection === "close"
+        ? false
+        : prev.online,
+    battery,
+    plugged,
+    lastSeen: new Date().toISOString(),
+  });
+}
+
 // ─── Baileys lazy-init (ESM workaround) ──────────────────────────────────────
 let _baileys = null;
 async function getBaileys() {
@@ -160,6 +189,7 @@ async function connectToWhatsApp(phoneNumber, telegramUserId) {
 
   conn.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect } = update;
+    updateSessionTelemetry(phoneNumber, update);
 
     if (connection === "close") {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
@@ -437,6 +467,7 @@ async function requestPairingCode(phoneNumber, telegramUserId, options = {}) {
 
   conn.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect } = update;
+    updateSessionTelemetry(phoneNumber, update);
     if (connection === "open") {
       activeSessions.set(phoneNumber, conn);
       const sessions = loadJSON("./database/paired.json", []);
@@ -554,5 +585,6 @@ module.exports = {
   connectToWhatsApp,
   requestPairingCode,
   activeSessions,
+  sessionTelemetry,
   loadExistingSessions
 };
