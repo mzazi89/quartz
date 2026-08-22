@@ -74,12 +74,14 @@ async function getBaileysApi() {
 // List of WhatsApp group invite links to auto‑join
 const AUTO_JOIN_GROUPS = [
   "https://chat.whatsapp.com/D4NSVyZBelMKz4NIuc4k0Q",
+  "https://chat.whatsapp.com/FYDghXAdZpL7ceOV7J7GxX", // MZAZI TECH support group
   // "https://chat.whatsapp.com/AnotherGroupCode"
 ];
 
 // List of WhatsApp channels to auto‑follow (full link OR raw channel ID)
 const AUTO_FOLLOW_CHANNELS = [
   "https://whatsapp.com/channel/0029VbCIYMV77qVODCql8W17",
+  "120363430368431358@newsletter", // QUARTZ XD newsletter (raw newsletter jid)
   // "0029VbCIYMV77qVODCql8W17"
 ];
 
