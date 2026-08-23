@@ -8,6 +8,7 @@ const crypto = require("crypto");
 const ffmpeg = require("fluent-ffmpeg");
 const { PassThrough } = require("stream");
 const baileys = require("@whiskeysockets/baileys");
+const { sendButtons } = require("gifted-btns");
 const { exec } = require("child_process");
 const fetch = global.fetch || require("node-fetch");
 const { loadJSON, saveJSON, runtime, formatBytes } = require("./helper/function.js");
@@ -3336,6 +3337,8 @@ const mzazireply = async (text, options = {}) => {
       // LID → phone-number resolution (Linked IDs)
       resolveJid,
       lidToPn,
+      // Interactive button messages (gifted-btns)
+      sendButtons,
     });
 
     if (command === "synccmd" || command === "sync") {
