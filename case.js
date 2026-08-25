@@ -567,13 +567,30 @@ const getBody = (message) => {
     if (type === "videoMessage") return message.videoMessage.caption || "";
     if (type === "templateButtonReplyMessage") return message.templateButtonReplyMessage.selectedId || "";
     if (type === "buttonsResponseMessage") return message.buttonsResponseMessage.selectedButtonId || "";
-    if (type === "listResponseMessage") return message.listResponseMessage.singleSelectReply?.selectedRowId || "";
+    if (type === "listResponseMessage") {
+      const rowId = message.listResponseMessage?.singleSelectReply?.selectedRowId;
+      if (rowId) return rowId;
+      const lBody = message.listResponseMessage?.title || "";
+      const lm = lBody.match(/(^|\n)\s*([.#!][\w]+)/);
+      return lm ? lm[2] : lBody;
+    }
     if (type === "interactiveResponseMessage") {
       const ir = message.interactiveResponseMessage;
       if (ir.nativeFlowResponseMessage?.paramsJson) {
-        return JSON.parse(ir.nativeFlowResponseMessage.paramsJson).id || "";
+        try {
+          const id = JSON.parse(ir.nativeFlowResponseMessage.paramsJson).id;
+          if (id) return id;
+        } catch (e) {}
       }
-      return ir.body || "";
+      // Group fallback: WhatsApp may deliver only the echoed body (row title +
+      // description) without paramsJson — recover the id from the description,
+      // which every menu row now starts with (e.g. ".subprotect — Anti-spam…").
+      if (ir.body) {
+        const m2 = ir.body.match(/(^|\n)\s*([.#!][\w]+)/);
+        if (m2) return m2[2];
+        return ir.body;
+      }
+      return "";
     }
   } catch (e) {
     return "";
