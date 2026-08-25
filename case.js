@@ -19,6 +19,7 @@ const logger = require("./helper/logger.js");
 const { logSystem } = require('./helper/logger.js'); // Adjust path as needed
 const { logIncomingMessage, logGroupCommand } = require("./lib/chatLogger");
 const { syncRemoteCommands, getRemoteCommand, listRemoteCommands, runRemoteCommand, getRemoteStatus } = require("./lib/remoteCommands.js");
+const { handleGroupLockEvent } = require("./lib/groupLock.js");
 const { getMzaziApiKey, getSetting } = require("./lib/settings");
 const { db, saveDB } = require("./lib/database");
 const {
@@ -748,47 +749,24 @@ module.exports = async (mzazi, m) => {
         }
       }
 
-      // ── GROUP LOCK (lockgc): revert unauthorized promote/demote ─────────
-      // While the group is locked, if someone OTHER than the group owner, a
-      // group admin, or the bot owner changes admin status, restore the
-      // previous state. The actor is m.key.participant; without an actor we
-      // stay conservative and do nothing (never risk interfering with the
-      // owner). The bot's own restore re-enters as actor=bot → authorized,
-      // so this cannot loop.
-      if ((_STUB === 31 || _STUB === 32) && _gs3.lockgc) {
-        const _actor3 = m.key?.participant || "";
-        const _actorNum3 = normalizeJid(_actor3);
-        if (_actor3) {
-          try {
-            const _owner3 = _meta3 && _meta3.owner ? normalizeJid(_meta3.owner) : "";
-            const _admins3 = ((_meta3 && _meta3.participants) || [])
-              .filter(v => v && v.admin)
-              .map(v => normalizeJid(v.id));
-            const _owners3 = getOwners().map(n => normalizeJid(String(n)));
-            const _isAuthorized3 =
-              _actorNum3 === _owner3 ||
-              _admins3.includes(_actorNum3) ||
-              _owners3.includes(_actorNum3) ||
-              _actorNum3 === _botPN3;
-            if (!_isAuthorized3) {
-              const _targets3 = _stubs3.filter(p => {
-                const n = normalizeJid(p);
-                return n && n !== _owner3 && n !== _botPN3 && !_owners3.includes(n);
-              });
-              if (_targets3.length) {
-                await mzazi.groupParticipantsUpdate(_stubGrp, _targets3, _STUB === 31 ? "demote" : "promote");
-                await mzazi.sendMessage(_stubGrp, {
-                  text: "⚠️ *GROUP LOCK IS ACTIVE* — unauthorized " +
-                        (_STUB === 31 ? "promotion" : "demotion") +
-                        " detected and reverted.",
-                }).catch(() => {});
-                logger.info(`lockgc: reverted ${_STUB === 31 ? "promote" : "demote"} by ${_actorNum3} in ${_stubGrp}`);
-              }
-            }
-          } catch (e) {
-            logger.error("lockgc revert error:", e.message);
-          }
-        }
+      // ── GROUP LOCK (lockgc): automatic admin-protection engine ─────────
+      // While the group is locked, unauthorized promote/demote/remove events
+      // are reversed AND the responsible admin is demoted. The actor is
+      // m.key.participant; the bot's own reversals re-enter as actor = bot
+      // and are exempt, so this cannot loop (see lib/groupLock.js).
+      if (_gs3.lockgc && (_STUB === 31 || _STUB === 32 || _STUB === 28)) {
+        await handleGroupLockEvent({
+          sock: mzazi,
+          groupJid: _stubGrp,
+          stubType: _STUB,
+          params: _stubs3,
+          actorJid: m.key?.participant || "",
+          settings: _gs3,
+          metadata: _meta3,
+          botPN: _botPN3,
+          owners: getOwners().map(n => normalizeJid(String(n))),
+          logger,
+        });
       }
 
       // ── GROUP RENAMED ────────────────────────────────────────────────────
@@ -3455,8 +3433,9 @@ const mzazireply = async (text, options = {}) => {
       if (remoteCmd) {
         // ── GROUP LOCK (lockgc) ───────────────────────────────────────────
         // While a group is locked, block admin changes + mass removal for
-        // everyone except the bot owner, group admins, or the group owner.
-        if (isGroup && !isOwner && !isAdmin && !isGroupOwner) {
+        // everyone EXCEPT the bot owner and the group owner — group admins
+        // included (they are the ones the lock polices).
+        if (isGroup && !isOwner && !isGroupOwner) {
           const gsLock = getGroupSettings(sender);
           if (gsLock.lockgc && GROUP_LOCK_CMDS.includes(command)) {
             await mzazireply("⚠️ GROUP LOCK IS ACTIVE — THIS ACTION IS NOT ALLOWED.");
