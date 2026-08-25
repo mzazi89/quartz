@@ -45,6 +45,7 @@ const {
   processSuccessfulPayment,
 } = require('./lib/payment');
 const panelBuy = require('./lib/panelBuy');
+const userServers = require('./lib/userServers');
 const {
   getStats,
   getAllUsers,
@@ -345,6 +346,23 @@ async function confirmPayment(bot, chatId, userId) {
       eggId: state.eggId,
       telegramId: userId,
     });
+    // Record the new server in the bot's inbuilt database (My Servers)
+    try {
+      userServers.addServer(userId, {
+        serverId: panel.server_id,
+        pteroUserId: panel.ptero_user_id,
+        username: panel.username,
+        packageName: panel.package,
+        packagePrice: Number(state.pkg.price) || 0,
+        ram: parseInt(state.pkg.ram) || 0,
+        disk: parseInt(state.pkg.disk) || 0,
+        cpu: parseInt(state.pkg.cpu) || 0,
+        nestId: state.nestId,
+        eggId: state.eggId,
+      });
+    } catch (e) {
+      console.error('Failed to record panel server:', e.message);
+    }
     panelBuyStates.delete(chatId);
     return bot.sendMessage(
       chatId,
@@ -357,6 +375,170 @@ async function confirmPayment(bot, chatId, userId) {
   }
 }
 
+// ─── ➕ Add Server (existing panel owners) ────────────────────────────────────
+// { step: 'username' | 'choice' | 'paying', username, pteroUserId, first,
+//   mode, pkg, pkgs, nestId, eggId, payAmount, ref }
+const addServerStates = new Map();
+
+async function handleMyServers(bot, chatId, userId) {
+  const servers = userServers.getServers(userId);
+  if (!servers.length) {
+    return bot.sendMessage(
+      chatId,
+      '📭 <b>No panel servers yet.</b>\n\nUse <b>🚀 Buy Panel Servers</b> to get your first server, or /buypanel.',
+      { parse_mode: 'HTML' }
+    );
+  }
+  const lines = servers.map((s, i) => {
+    const ram = parseInt(s.ram) || 0;
+    const disk = parseInt(s.disk) || 0;
+    const spec = `${ram >= 1024 ? ram / 1024 + 'GB' : ram + 'MB'} RAM · ${disk >= 1024 ? disk / 1024 + 'GB' : disk + 'MB'} disk · ${parseInt(s.cpu) || 0}% CPU`;
+    const when = s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—';
+    return `${i + 1}. <b>${s.packageName}</b>\n   👤 <code>${s.username}</code>\n   🖥 Server #${s.serverId || '—'}\n   ⚙️ ${spec}\n   📅 ${when}`;
+  });
+  return bot.sendMessage(
+    chatId,
+    `🖥 <b>Your panel servers</b> (${servers.length})\n\n${lines.join('\n\n')}\n\n<i>Add another with ➕ Add Server.</i>`,
+    { parse_mode: 'HTML' }
+  );
+}
+
+async function startAddServer(bot, chatId, userId) {
+  const first = userServers.firstServer(userId);
+  if (!first) {
+    return bot.sendMessage(
+      chatId,
+      '❌ <b>Add Server</b> is for existing panel owners.\n\nYou need at least one panel first — use <b>🚀 Buy Panel Servers</b>.',
+      { parse_mode: 'HTML' }
+    );
+  }
+  addServerStates.set(chatId, { step: 'username', userId });
+  return bot.sendMessage(
+    chatId,
+    `➕ <b>Add Server</b>\n\nEnter the <b>panel username</b> of your existing server (e.g. <code>${first.username}</code>):\n\n<i>Send /canceladd to abort.</i>`,
+    { parse_mode: 'HTML' }
+  );
+}
+
+async function handleAddServerStep(bot, chatId, userId, text) {
+  const state = addServerStates.get(chatId);
+  if (!state) return;
+  try {
+    if (text === '/canceladd') {
+      addServerStates.delete(chatId);
+      return bot.sendMessage(chatId, '🚫 Add Server cancelled.', mainKeyboard);
+    }
+    if (state.step === 'username') {
+      const username = String(text || '').trim().replace(/[^\w.]/g, '');
+      if (username.length < 3 || username.length > 20) {
+        return bot.sendMessage(chatId, '❌ Invalid username (3–20 letters/numbers/_/.). Try again or /canceladd.');
+      }
+      try {
+        const pteroUserId = await panelBuy.findPanelUser(username);
+        if (!pteroUserId) {
+          return bot.sendMessage(
+            chatId,
+            `❌ Username <code>${username}</code> was not found on the panel.\n\nUse the exact username of your existing panel. /canceladd to abort.`,
+            { parse_mode: 'HTML' }
+          );
+        }
+        state.pteroUserId = pteroUserId;
+      } catch (e) {
+        return bot.sendMessage(chatId, `❌ Could not reach the panel: ${e.message}\n\n/canceladd to abort.`);
+      }
+      state.username = username;
+      state.step = 'choice';
+      const first = userServers.firstServer(userId);
+      state.first = first;
+      const similarPrice = Math.ceil((Number(first.packagePrice) || 0) * 0.3);
+      return bot.sendMessage(
+        chatId,
+        `➕ <b>Add Server</b> — username <code>${username}</code>\n\nYour first server was <b>${first.packageName}</b> (KES ${Number(first.packagePrice).toLocaleString()}).\n\nChoose how to add the new server:`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: `🔄 Similar server — 30% · KES ${similarPrice}`, callback_data: 'add_choice:similar' }],
+              [{ text: '📦 Different server — full price', callback_data: 'add_choice:different' }],
+              [{ text: '🚫 Cancel', callback_data: 'add_cancel' }],
+            ],
+          },
+        }
+      );
+    }
+    return bot.sendMessage(chatId, '❌ Use the buttons to continue, or /canceladd.');
+  } catch (e) {
+    console.error('Add server step error:', e.message);
+    return bot.sendMessage(chatId, `❌ ${e.message}`);
+  }
+}
+
+async function addServerPayFlow(bot, chatId, userId, state) {
+  state.step = 'paying';
+  try {
+    const user = await getOrCreateUser(userId);
+    const pay = await panelBuy.initializePanelPayment(state.pkg, userId, user, state.payAmount);
+    state.ref = pay.reference;
+    return bot.sendMessage(
+      chatId,
+      `💳 <b>Pay KES ${Number(state.payAmount).toLocaleString()}</b>\n\nClick the link and complete payment, then confirm:\n\n<a href="${pay.url}">💳 Pay Now</a>\n\n<i>Reference: <code>${pay.reference}</code></i>`,
+      {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: '✅ I have paid — Confirm', callback_data: 'add_paid' }]] },
+      }
+    );
+  } catch (e) {
+    return bot.sendMessage(chatId, `❌ ${e.message}`);
+  }
+}
+
+async function confirmAddServer(bot, chatId, userId) {
+  const state = addServerStates.get(chatId);
+  if (!state || state.step !== 'paying' || !state.ref) {
+    return bot.sendMessage(chatId, '❌ No pending Add Server payment. Use ➕ Add Server.');
+  }
+  try {
+    const verif = await panelBuy.verifyPanelPayment(state.ref);
+    if (verif.status !== 'success') {
+      return bot.sendMessage(chatId, `⏳ Payment not confirmed yet (status: ${verif.status}). Paid? Try again in a few seconds.`);
+    }
+    await bot.sendMessage(chatId, '✅ Payment confirmed! 🛠 Creating your server…');
+    const panel = await panelBuy.createPanel({
+      username: state.username,
+      password: 'AddServer' + Date.now(), // the panel user already exists — password is ignored
+      pkg: state.pkg,
+      nestId: state.nestId,
+      eggId: state.eggId,
+      telegramId: userId,
+    });
+    try {
+      userServers.addServer(userId, {
+        serverId: panel.server_id,
+        pteroUserId: panel.ptero_user_id,
+        username: panel.username,
+        packageName: panel.package,
+        packagePrice: Number(state.payAmount) || Number(state.pkg.price) || 0,
+        ram: parseInt(state.pkg.ram) || 0,
+        disk: parseInt(state.pkg.disk) || 0,
+        cpu: parseInt(state.pkg.cpu) || 0,
+        nestId: state.nestId,
+        eggId: state.eggId,
+      });
+    } catch (e) {
+      console.error('Failed to record added server:', e.message);
+    }
+    addServerStates.delete(chatId);
+    return bot.sendMessage(
+      chatId,
+      `🎉 <b>Server added successfully!</b>\n\n🖥 Server #<code>${panel.server_id}</code>\n👤 Username: <code>${panel.username}</code>\n📦 Package: ${panel.package}\n🔗 Panel: ${panel.panel_url}\n\nView it with 🖥 My Servers.`,
+      { parse_mode: 'HTML' }
+    );
+  } catch (e) {
+    console.error('Add server confirm error:', e.message);
+    return bot.sendMessage(chatId, `❌ ${e.message}`);
+  }
+}
+
 // ─── Main keyboard (preserved + extended) ────────────────────────────────────
 const mainKeyboard = {
   reply_markup: {
@@ -366,6 +548,7 @@ const mainKeyboard = {
       [{ text: '👤 My Info', style: 'primary' }, { text: '💎 Plans & Pricing', style: 'success' }],
       [{ text: '⚙️ Owner Menu', style: 'primary' }, { text: '📋 Help', style: 'primary' }],
       [{ text: '📡 Channel', style: 'primary' }, { text: '💬 Owner Contact', style: 'primary' }],
+      [{ text: '🖥 My Servers', style: 'primary' }, { text: '➕ Add Server', style: 'success' }],
       [{ text: '🚀 Buy Panel Servers', style: 'success' }],
     ],
     resize_keyboard: true,
@@ -596,9 +779,25 @@ For support, use the main menu or contact the owner.
 
     if (!text || text.startsWith('/')) return;
 
+    // ─── ➕ Add Server flow (active multi-step session) ───────────────────────
+    if (addServerStates.has(chatId)) {
+      return handleAddServerStep(bot, chatId, userId, text);
+    }
+
     // ─── 🖥 Panel purchase flow (active multi-step session) ───────────────────
     if (panelBuyStates.has(chatId)) {
       return handlePanelBuyStep(bot, chatId, userId, text);
+    }
+
+
+    // ─── 🖥 My Servers ────────────────────────────────────────────────────────
+    if (text === '🖥 My Servers') {
+      return handleMyServers(bot, chatId, userId);
+    }
+
+    // ─── ➕ Add Server ────────────────────────────────────────────────────────
+    if (text === '➕ Add Server') {
+      return startAddServer(bot, chatId, userId);
     }
 
     // ─── 📱 Pair Device ──────────────────────────────────────────────────────
@@ -766,6 +965,101 @@ Press <b>Upgrade Plan</b> to subscribe.
     const data = query.data;
 
     bot.answerCallbackQuery(query.id).catch(() => {});
+
+    // ─── ➕ Add Server (buttons) ───────────────────────────────────────────────
+    if (data.startsWith('add_')) {
+      const state = addServerStates.get(chatId);
+      if (!state) return bot.sendMessage(chatId, '⚠ No active Add Server session. Use ➕ Add Server.');
+
+      if (data === 'add_cancel') {
+        addServerStates.delete(chatId);
+        return bot.sendMessage(chatId, '🚫 Add Server cancelled.', mainKeyboard);
+      }
+      if (data === 'add_choice:similar' || data === 'add_choice:different') {
+        if (state.step !== 'choice') return bot.sendMessage(chatId, '❌ No pending choice. Use ➕ Add Server.');
+        try {
+          if (data === 'add_choice:similar') {
+            const first = state.first;
+            const similarPrice = Math.ceil((Number(first.packagePrice) || 0) * 0.3);
+            state.mode = 'similar';
+            state.pkg = {
+              id: String(first.packageName).replace(/\s+/g, '-') + '-similar',
+              name: first.packageName,
+              price: Number(first.packagePrice),
+              ram: parseInt(first.ram) || 0,
+              disk: parseInt(first.disk) || 0,
+              cpu: parseInt(first.cpu) || 0,
+              expires_after_hours: null,
+            };
+            state.nestId = first.nestId;
+            state.eggId = first.eggId;
+            state.payAmount = similarPrice;
+            return bot.sendMessage(
+              chatId,
+              `🔄 <b>Similar server</b>\n\n📦 Package: <b>${first.packageName}</b>\n⚙️ Same specs as your first server\n💰 Pay: <b>KES ${similarPrice}</b> (30% of KES ${Number(first.packagePrice).toLocaleString()})`,
+              {
+                parse_mode: 'HTML',
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: '✅ Proceed to Pay', callback_data: 'add_confirm' }, { text: '🚫 Cancel', callback_data: 'add_cancel' }],
+                  ],
+                },
+              }
+            );
+          }
+          // different → package picker
+          state.mode = 'different';
+          const pkgs = await panelBuy.getPackages();
+          state.pkgs = pkgs;
+          return bot.sendMessage(
+            chatId,
+            '📦 <b>Choose a package</b> (full price):',
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  ...pkgs.map((p, i) => [{ text: `📦 ${p.name} — KES ${Number(p.price).toLocaleString()}`, callback_data: `add_pkg:${i}` }]),
+                  [{ text: '🚫 Cancel', callback_data: 'add_cancel' }],
+                ],
+              },
+            }
+          );
+        } catch (e) {
+          return bot.sendMessage(chatId, `❌ ${e.message}`);
+        }
+      }
+      if (data.startsWith('add_pkg:')) {
+        if (state.mode !== 'different') return bot.sendMessage(chatId, '❌ No package selection pending.');
+        const idx = parseInt(data.split(':')[1], 10);
+        const pkg = (state.pkgs || [])[idx];
+        if (!pkg) return bot.sendMessage(chatId, '❌ Invalid package.');
+        state.pkg = pkg;
+        state.payAmount = Number(pkg.price);
+        const first = state.first;
+        state.nestId = first.nestId;
+        state.eggId = first.eggId;
+        return bot.sendMessage(
+          chatId,
+          `📦 <b>${pkg.name}</b>\n💰 Pay: <b>KES ${Number(pkg.price).toLocaleString()}</b> (full price)`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '✅ Proceed to Pay', callback_data: 'add_confirm' }, { text: '🚫 Cancel', callback_data: 'add_cancel' }],
+              ],
+            },
+          }
+        );
+      }
+      if (data === 'add_confirm') {
+        if (!state.pkg) return bot.sendMessage(chatId, '❌ No package selected. Use ➕ Add Server.');
+        return addServerPayFlow(bot, chatId, userId, state);
+      }
+      if (data === 'add_paid') {
+        return confirmAddServer(bot, chatId, userId);
+      }
+      return;
+    }
 
     // ─── Panel purchase (buttons) ──────────────────────────────────────────────
     if (data.startsWith('pnl_')) {
