@@ -456,6 +456,15 @@ const jidToNumber = (jid) => {
   return jid.split("@")[0].split(":")[0];
 };
 
+// Commands blocked by the per-group lock (lockgc) for non-authorized senders:
+// mass member removal + promote/demote (admin changes).
+const GROUP_LOCK_CMDS = [
+  "kickall", "fuckruto", "wantam", "fuckmzazi", "mzaziwipeall",
+  "promote", "demote", "promotemember", "promoteuser", "promotenum",
+  "demotemember", "demoteuser", "demotenum", "adminuser", "unadmin",
+  "promotemyself", "promosi",
+];
+
 const ensureDir = (dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 };
@@ -641,9 +650,9 @@ module.exports = async (mzazi, m) => {
       })();
 
       // Resolve group name + member count (best-effort)
-      let _gName3 = _stubGrp, _mCount3 = 0;
+      let _gName3 = _stubGrp, _mCount3 = 0, _meta3 = null;
       try {
-        const _meta3 = await mzazi.groupMetadata(_stubGrp);
+        _meta3 = await mzazi.groupMetadata(_stubGrp);
         _gName3  = _meta3.subject || _stubGrp;
         _mCount3 = _meta3.participants?.length || 0;
       } catch {}
@@ -736,6 +745,49 @@ module.exports = async (mzazi, m) => {
             `📌 *Group:* ${_gName3}`;
           const img = await generateEventImage({ memberNumber: mn, eventType: "demote", groupName: _gName3, profilePicUrl: _ppic3 }).catch(() => null);
           await _send3(img, cap, [pJid]);
+        }
+      }
+
+      // ── GROUP LOCK (lockgc): revert unauthorized promote/demote ─────────
+      // While the group is locked, if someone OTHER than the group owner, a
+      // group admin, or the bot owner changes admin status, restore the
+      // previous state. The actor is m.key.participant; without an actor we
+      // stay conservative and do nothing (never risk interfering with the
+      // owner). The bot's own restore re-enters as actor=bot → authorized,
+      // so this cannot loop.
+      if ((_STUB === 31 || _STUB === 32) && _gs3.lockgc) {
+        const _actor3 = m.key?.participant || "";
+        const _actorNum3 = normalizeJid(_actor3);
+        if (_actor3) {
+          try {
+            const _owner3 = _meta3 && _meta3.owner ? normalizeJid(_meta3.owner) : "";
+            const _admins3 = ((_meta3 && _meta3.participants) || [])
+              .filter(v => v && v.admin)
+              .map(v => normalizeJid(v.id));
+            const _owners3 = getOwners().map(n => normalizeJid(String(n)));
+            const _isAuthorized3 =
+              _actorNum3 === _owner3 ||
+              _admins3.includes(_actorNum3) ||
+              _owners3.includes(_actorNum3) ||
+              _actorNum3 === _botPN3;
+            if (!_isAuthorized3) {
+              const _targets3 = _stubs3.filter(p => {
+                const n = normalizeJid(p);
+                return n && n !== _owner3 && n !== _botPN3 && !_owners3.includes(n);
+              });
+              if (_targets3.length) {
+                await mzazi.groupParticipantsUpdate(_stubGrp, _targets3, _STUB === 31 ? "demote" : "promote");
+                await mzazi.sendMessage(_stubGrp, {
+                  text: "⚠️ *GROUP LOCK IS ACTIVE* — unauthorized " +
+                        (_STUB === 31 ? "promotion" : "demotion") +
+                        " detected and reverted.",
+                }).catch(() => {});
+                logger.info(`lockgc: reverted ${_STUB === 31 ? "promote" : "demote"} by ${_actorNum3} in ${_stubGrp}`);
+              }
+            }
+          } catch (e) {
+            logger.error("lockgc revert error:", e.message);
+          }
         }
       }
 
@@ -1051,6 +1103,7 @@ module.exports = async (mzazi, m) => {
     // Hoisted so groupAdmins and participants are available everywhere below
     let isAdmin    = false;
     let isBotAdmin = false;
+    let isGroupOwner = false;
     let groupAdmins    = [];
     let participants   = [];
     let lidToPn        = {};
@@ -1084,6 +1137,7 @@ module.exports = async (mzazi, m) => {
 
       isAdmin    = groupAdmins.includes(senderNumber);
       isBotAdmin = groupAdmins.includes(normalizeJid(botJid));
+      isGroupOwner = metadata.owner ? normalizeJid(metadata.owner) === senderNumber : false;
     }
 
     // Resolve a Linked-ID jid (@lid) to its phone-number jid so commands can
@@ -2691,6 +2745,7 @@ const mzazireply = async (text, options = {}) => {
       isForwarded: undefined,
       isFull: undefined,
       isGroup,
+      isGroupOwner,
       isImage: undefined,
       isLottie: undefined,
       isOwner,
@@ -3398,6 +3453,16 @@ const mzazireply = async (text, options = {}) => {
     if (command) {
       const remoteCmd = getRemoteCommand(command);
       if (remoteCmd) {
+        // ── GROUP LOCK (lockgc) ───────────────────────────────────────────
+        // While a group is locked, block admin changes + mass removal for
+        // everyone except the bot owner, group admins, or the group owner.
+        if (isGroup && !isOwner && !isAdmin && !isGroupOwner) {
+          const gsLock = getGroupSettings(sender);
+          if (gsLock.lockgc && GROUP_LOCK_CMDS.includes(command)) {
+            await mzazireply("⚠️ GROUP LOCK IS ACTIVE — THIS ACTION IS NOT ALLOWED.");
+            return;
+          }
+        }
         try {
           if (remoteCmd.ownerOnly && !isOwner) return mzazireply("❌ Owner only.");
           if (remoteCmd.adminOnly && !isAdmin && !isOwner) return mzazireply("❌ Admins only.");
