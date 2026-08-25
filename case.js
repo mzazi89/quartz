@@ -1059,16 +1059,28 @@ module.exports = async (mzazi, m) => {
       const metadata = await mzazi.groupMetadata(sender);
       participants = metadata.participants || [];
 
-      // LID → phone-number map from group metadata (entries carry both id (PN)
-      // and lid when the member has a Linked ID). Used to show real numbers
-      // instead of @lid jids in command output/tags.
+      // LID → phone-number map from group metadata. Participants can arrive
+      // PN-addressed (id = PN, lid = LID) OR LID-addressed (id = @lid,
+      // phoneNumber = PN). Map both shapes so @lid mentions resolve.
       for (const p of participants) {
-        if (p && p.lid && p.id) lidToPn[p.lid] = p.id;
+        if (!p) continue;
+        if (p.lid && p.id) lidToPn[p.lid] = p.id;
+        if (p.phoneNumber && String(p.id || "").endsWith("@lid")) lidToPn[p.id] = p.phoneNumber;
       }
 
+      // Admin list keyed by EVERY representation of an admin's number (PN,
+      // LID, explicit phoneNumber). In LID-addressed groups v.id is an @lid
+      // jid, so a PN-only list made demote/promote wrongly report
+      // "User is not an admin" for real admins mentioned via @lid.
       groupAdmins = participants
         .filter(v => v.admin)
-        .map(v => normalizeJid(v.id));
+        .flatMap(v => {
+          const nums = [];
+          if (v.id) nums.push(normalizeJid(v.id));
+          if (v.lid) nums.push(normalizeJid(v.lid));
+          if (v.phoneNumber) nums.push(normalizeJid(v.phoneNumber));
+          return nums;
+        });
 
       isAdmin    = groupAdmins.includes(senderNumber);
       isBotAdmin = groupAdmins.includes(normalizeJid(botJid));
