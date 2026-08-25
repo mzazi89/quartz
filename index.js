@@ -82,46 +82,54 @@ const saveData = () => {
 };
 
 // ─── Bot setup (FIXED: All bots created and used) ──────────────────────────
-const tokens = config.telegramToken
-  .split(",")
-  .map(t => t.trim())
-  .filter(t => t.length > 0); // Remove empty tokens
+// Bots boot AFTER DB-backed settings load so admin-configured values
+// (Telegram tokens etc. from the admin Settings page) apply at startup.
+let bots = [];
 
-const bots = tokens.map((token, index) => {
-  try {
-    const bot = new TelegramBot(token, {
-      polling: true,
-    });
+async function startBots() {
+  await config.loadBotSettings(true).catch(() => {}); // DB unreachable → env/static fallbacks
 
-    console.log(`[+] Bot ${index + 1} started: ${token.split(":")[0]}`);
+  const tokens = config.telegramToken
+    .split(",")
+    .map(t => t.trim())
+    .filter(t => t.length > 0); // Remove empty tokens
 
-    // Error handling per bot
-    bot.on('error', (error) => {
-      console.error(`[!] Bot ${index + 1} error:`, error.message);
-      logSystem(`Bot ${index + 1} error: ${error.message}`, 'error');
-    });
+  bots = tokens.map((token, index) => {
+    try {
+      const bot = new TelegramBot(token, {
+        polling: true,
+      });
 
-    bot.on('polling_error', (error) => {
-      console.error(`[!] Bot ${index + 1} polling error:`, error.message);
-      logSystem(`Bot ${index + 1} polling error: ${error.message}`, 'error');
-    });
+      console.log(`[+] Bot ${index + 1} started: ${token.split(":")[0]}`);
 
-    return bot;
-  } catch (error) {
-    console.error(`[!] Failed to start bot ${index + 1}:`, error.message);
-    logSystem(`Failed to start bot ${index + 1}: ${error.message}`, 'error');
-    return null;
+      // Error handling per bot
+      bot.on('error', (error) => {
+        console.error(`[!] Bot ${index + 1} error:`, error.message);
+        logSystem(`Bot ${index + 1} error: ${error.message}`, 'error');
+      });
+
+      bot.on('polling_error', (error) => {
+        console.error(`[!] Bot ${index + 1} polling error:`, error.message);
+        logSystem(`Bot ${index + 1} polling error: ${error.message}`, 'error');
+      });
+
+      return bot;
+    } catch (error) {
+      console.error(`[!] Failed to start bot ${index + 1}:`, error.message);
+      logSystem(`Failed to start bot ${index + 1}: ${error.message}`, 'error');
+      return null;
+    }
+  }).filter(bot => bot !== null);
+
+  if (bots.length === 0) {
+    console.error("[!] No bots started successfully!");
+    logSystem("No bots started successfully!", 'error');
+    process.exit(1);
   }
-}).filter(bot => bot !== null);
 
-if (bots.length === 0) {
-  console.error("[!] No bots started successfully!");
-  logSystem("No bots started successfully!", 'error');
-  process.exit(1);
+  console.log(`[+] ${bots.length} bots running with shared state`);
+  logSystem(`${bots.length} bots online with shared state`, 'success');
 }
-
-console.log(`[+] ${bots.length} bots running with shared state`);
-logSystem(`${bots.length} bots online with shared state`, 'success');
 
 // ─── Owner helpers (preserved) ───────────────────────────────────────────────
 const isOwner = (userId) => userId === config.telegramOwner;
@@ -1596,14 +1604,30 @@ Valid for 1 hour.
   console.log(`[+] Bot ${botIndex + 1} handlers setup complete`);
 }
 
-// ─── APPLY HANDLERS TO ALL BOTS ─────────────────────────────────────────────
-bots.forEach((bot, index) => {
-  setupBotHandlers(bot, index);
-});
+// ─── APPLY HANDLERS TO ALL BOTS + STARTUP ────────────────────────────────────
+// Runs after the DB-backed settings preload so admin-configured Telegram
+// tokens / webhook port apply from the very first boot.
+startBots()
+  .then(() => {
+    bots.forEach((bot, index) => {
+      setupBotHandlers(bot, index);
+    });
 
-// ─── Startup ──────────────────────────────────────────────────────────────────
-logBanner();
-logSystem(`Telegram Bot Online - ${bots.length} bots running`, 'success');
+    logBanner();
+    logSystem(`Telegram Bot Online - ${bots.length} bots running`, 'success');
+
+    // Start webhook server (for Paystack) — port can come from the admin page
+    const webhookPort = config.webhookPort || 3000;
+    startWebhookServer(bots, webhookPort);
+
+    // Start cron jobs (subscription expiry)
+    startCronJobs(bots);
+  })
+  .catch((error) => {
+    console.error("[!] Bot startup failed:", error);
+    logSystem(`Bot startup failed: ${error.message || error}`, 'error');
+    process.exit(1);
+  });
 
 // ─── Auto-migrate: ensure Neon DB tables exist ──────────────────────────────
 (async () => {
@@ -1634,13 +1658,6 @@ logSystem(`Telegram Bot Online - ${bots.length} bots running`, 'success');
     logSystem('Bot will continue — but subscription/payment features need a valid DATABASE_URL.', 'warn');
   }
 })();
-
-// Start webhook server (for Paystack)
-const webhookPort = config.webhookPort || 3000;
-startWebhookServer(bots, webhookPort);
-
-// Start cron jobs (subscription expiry)
-startCronJobs(bots);
 
 // Load existing WhatsApp sessions
 setTimeout(async () => {

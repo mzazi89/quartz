@@ -1,4 +1,17 @@
-module.exports = {
+// ─────────────────────────────────────────────────────────────────────────────
+// BOT CONFIG — static defaults + live overrides from the shared Neon DB.
+//
+// Every value below can be overridden from the ADMIN SETTINGS PAGE
+// (admin.mzazi.shop/admin/settings), which writes to the shared `settings`
+// table. This module refreshes those overrides:
+//   • at require time,
+//   • every 60 seconds (same TTL as lib/settings.js),
+//   • on demand via loadBotSettings(true).
+//
+// Precedence: DB override  →  process.env  →  static default below.
+// (DATABASE_URL stays in the server env on purpose — never stored in the DB.)
+// ─────────────────────────────────────────────────────────────────────────────
+const staticConfig = {
   botName: "MZAZI TECH QUARTZ BOT",
   owner: "Mrs Mzazi",
 
@@ -35,6 +48,10 @@ module.exports = {
   // Used by Download-category bot commands (e.g. .play, .yt, .tiktok).
   mzaziSiteUrl: process.env.MZAZI_SITE_URL || "https://mzazi.shop",
   mzaziApiKey: process.env.MZAZI_API_KEY || "",
+
+  // ─── Telemetry ──────────────────────────────────────────────────────────────
+  // Reported public IP (bot_status) — leave empty to auto-detect.
+  botIp: process.env.BOT_IP || "",
 
   // ─── Subscription Plans ──────────────────────────────────────────────────────
   plans: {
@@ -90,3 +107,79 @@ module.exports = {
     }
   }
 };
+
+// ─── Dynamic overrides from the shared Neon `settings` table ─────────────────
+// DB key (admin Settings page) → config key, with optional coercion.
+const DB_KEY_MAP = [
+  ['bot_name',             'botName'],
+  ['owner',                'owner'],
+  ['telegram_owner',       'telegramOwner',    Number],
+  ['whatsapp_owner',       'whatsappOwner'],
+  ['connection_image',     'connectionImage'],
+  ['telegram_bot_token',   'telegramToken'],
+  ['remote_api_url',       'remoteApiUrl'],
+  ['bot_api_key',          'remoteApiKey'],
+  ['paystack_secret_key',  'paystackSecretKey'],
+  ['paystack_public_key',  'paystackPublicKey'],
+  ['webhook_port',         'webhookPort',      Number],
+  ['webhook_url',          'webhookUrl'],
+  ['mzazi_site_url',       'mzaziSiteUrl'],
+  ['mzazi_api_key',        'mzaziApiKey'],
+  ['bot_ip',               'botIp'],
+];
+
+const overrides = new Map(); // configKey -> value (DB wins over env/static)
+
+function applyOverrides(rows) {
+  for (const [dbKey, cfgKey, coerce] of DB_KEY_MAP) {
+    const raw = rows && rows[dbKey];
+    const val = raw === null || raw === undefined ? "" : String(raw).trim();
+    if (!val) continue; // empty field → keep env/static fallback
+    let out = val;
+    if (cfgKey === "whatsappOwner" && /^[0-9]+$/.test(val)) out = val + "@s.whatsapp.net";
+    if (coerce === Number) {
+      const n = Number(val);
+      if (!Number.isNaN(n)) out = n;
+    }
+    overrides.set(cfgKey, out);
+  }
+}
+
+function getConfig() {
+  return { ...staticConfig, ...Object.fromEntries(overrides) };
+}
+
+async function loadBotSettings(force = false) {
+  try {
+    if (!process.env.DATABASE_URL) return getConfig(); // no DB configured — env/static only
+    const { loadSettings } = require("./lib/settings");
+    applyOverrides(await loadSettings(force));
+  } catch (e) {
+    // settings table unreachable — keep env/static fallbacks
+  }
+  return getConfig();
+}
+
+// Config object — DB override wins, then env/static default.
+const config = new Proxy(staticConfig, {
+  get(target, prop, receiver) {
+    if (overrides.has(prop)) return overrides.get(prop);
+    return Reflect.get(target, prop, receiver);
+  },
+  set(target, prop, value) {
+    overrides.set(prop, value);
+    return true;
+  },
+});
+
+// Attach helpers to the exported object.
+staticConfig.loadBotSettings = loadBotSettings;
+staticConfig.applyOverrides = applyOverrides;
+staticConfig.getConfig = getConfig;
+
+// Kick off the first load immediately; refresh every 60s (same cadence as
+// lib/settings.js). Failures are silent — the bot keeps its fallbacks.
+loadBotSettings(false).catch(() => {});
+setInterval(() => { loadBotSettings(false).catch(() => {}); }, 60 * 1000);
+
+module.exports = config;
