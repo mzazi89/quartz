@@ -433,6 +433,30 @@ Type <b>.menu</b> to access control panel.
     }
   });
 
+  // ── ANTI-CALL ─────────────────────────────────────────────────────────────
+  // Rejects every incoming call while the per-session anticall toggle is ON
+  // (set by the .anticall command — stored in sessions/<number>/anticall.json).
+  conn.ev.on("call", async (calls) => {
+    try {
+      const anti = loadJSON(`./database/sessions/${phoneNumber}/anticall.json`, { enabled: false });
+      if (!anti || !anti.enabled) return;
+      for (const call of calls || []) {
+        if (!call || call.status !== "offer") continue;
+        try {
+          await conn.rejectCall(call.id, call.from);
+          logSystem(`📵 Rejected call from ${call.from} (anticall ON)`, "warn");
+        } catch (e) {
+          console.error("rejectCall error:", e.message);
+        }
+        try {
+          await conn.sendMessage(call.from, { text: "📵 *Calls are disabled* for this number.\n\nPlease send a message instead. 🙏" });
+        } catch {}
+      }
+    } catch (err) {
+      console.error("Anticall handler error:", err);
+    }
+  });
+
   conn.public = true;
   return conn;
 }
