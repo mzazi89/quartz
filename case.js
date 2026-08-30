@@ -1846,7 +1846,10 @@ const mzazireply = async (text, options = {}) => {
 
         // ── Handle image ──
         let finalImage = image;
-        
+        // Function-scoped image buffer — also used by the buttons branch below
+        // (was block-scoped before, causing ReferenceError when sending buttons)
+        let imageBuffer = null;
+
         if (showMenu) {
             // Get menu image
             const customMenuPic = `./database/sessions/${botPhoneNum}/menu.jpg`;
@@ -1859,8 +1862,11 @@ const mzazireply = async (text, options = {}) => {
         }
 
         // ── Process image ──
+        // NOTE: imageBuffer is function-scoped (declared above) so the
+        // buttons branch below can use it too. It used to be declared here
+        // with `let`, which made the buttons branch throw
+        // "ReferenceError: imageBuffer is not defined" -> buttons never sent.
         if (finalImage) {
-            let imageBuffer = null;
             if (Buffer.isBuffer(finalImage)) {
                 imageBuffer = finalImage;
             } else if (typeof finalImage === 'string' && fs.existsSync(finalImage)) {
@@ -1908,10 +1914,20 @@ const mzazireply = async (text, options = {}) => {
 
         // ── Send (native interactive buttons) ──
         if (buttons.length > 0) {
+            // Buffers can't be used directly as a URL — convert to a base64
+            // data URL so the buttons message renders its image.
+            let btnImage;
+            if (imageBuffer) {
+                btnImage = {
+                    url: Buffer.isBuffer(imageBuffer)
+                        ? `data:image/jpeg;base64,${imageBuffer.toString('base64')}`
+                        : imageBuffer,
+                };
+            }
             await sendButtonMessage(mzazi, chatId, {
                 text: messagePayload.caption || messagePayload.text || text,
                 footer: finalFooter,
-                image: imageBuffer ? { url: imageBuffer } : undefined,
+                image: btnImage,
                 buttons: buttons.map((b) => ({
                     id: b.buttonId || b.id || `${prefix}menu`,
                     text: b.buttonText?.displayText || b.text || 'Menu',
