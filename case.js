@@ -1914,15 +1914,12 @@ const mzazireply = async (text, options = {}) => {
 
         // ── Send (native interactive buttons) ──
         if (buttons.length > 0) {
-            // Buffers can't be used directly as a URL — convert to a base64
-            // data URL so the buttons message renders its image.
+            // Pass the RAW buffer to sendButtonMessage — lib/buttons.js
+            // uploads it via Baileys prepareWAMessageMedia (data-URLs can't
+            // be uploaded). String URLs are passed as { url }.
             let btnImage;
             if (imageBuffer) {
-                btnImage = {
-                    url: Buffer.isBuffer(imageBuffer)
-                        ? `data:image/jpeg;base64,${imageBuffer.toString('base64')}`
-                        : imageBuffer,
-                };
+                btnImage = Buffer.isBuffer(imageBuffer) ? imageBuffer : { url: imageBuffer };
             }
             await sendButtonMessage(mzazi, chatId, {
                 text: messagePayload.caption || messagePayload.text || text,
