@@ -2321,21 +2321,55 @@ const mzazireply = async (text, options = {}) => {
       }
 
       const plan = getPlanSummary(planKey);
-      await mzazireply(
-        `💳 *PAYMENT INITIATED*\n\n` +
-        `📦 Plan: *${plan.name}*\n` +
-        `💰 Amount: *KES ${plan.price}*\n` +
-        `⏳ Validity: *${plan.days} days*\n` +
-        `🔖 Reference: \`${result.reference}\`\n\n` +
-        `Pay here:\n${result.url}\n\n` +
-        `After payment, tap *Verify Payment* or send:\n${prefix}verify ${result.reference}`,
-        {
-          customButtons: [
-            { id: `${prefix}verify ${result.reference}`, text: "✅ Verify Payment" },
-            { id: `${prefix}menu`, text: "📜 Menu" },
+      // Native interactive payment card: PAY NOW CTA button carries the
+      // Paystack URL (no raw link in the text) + quick-reply Verify/Menu.
+      try {
+        await sendInteractiveMessage(mzazi, sender, {
+          title: "💳 PAYMENT INITIATED",
+          text:
+            `📦 Plan: *${plan.name}*\n` +
+            `💰 Amount: *KES ${plan.price}*\n` +
+            `⏳ Validity: *${plan.days} days*\n` +
+            `🔖 Reference: \`${result.reference}\`\n\n` +
+            `👇 Tap *PAY NOW* to complete your payment, then tap *Verify Payment*.`,
+          footer: "⚡ Powered by MZAZI TECH INC",
+          interactiveButtons: [
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                display_text: "🔗 PAY NOW",
+                url: result.url,
+              }),
+            },
+            {
+              name: "quick_reply",
+              buttonParamsJson: JSON.stringify({
+                display_text: "✅ Verify Payment",
+                id: `${prefix}verify ${result.reference}`,
+              }),
+            },
+            {
+              name: "quick_reply",
+              buttonParamsJson: JSON.stringify({
+                display_text: "📜 Menu",
+                id: `${prefix}menu`,
+              }),
+            },
           ],
-        }
-      );
+        });
+      } catch (e) {
+        console.error("❌ PAYMENT BUTTONS ERROR:", e?.message || e);
+        // Fallback: plain text so the payment flow still works
+        await mzazireply(
+          `💳 *PAYMENT INITIATED*\n\n` +
+          `📦 Plan: *${plan.name}*\n` +
+          `💰 Amount: *KES ${plan.price}*\n` +
+          `⏳ Validity: *${plan.days} days*\n` +
+          `🔖 Reference: \`${result.reference}\`\n\n` +
+          `Pay here:\n${result.url}\n\n` +
+          `After payment, send:\n${prefix}verify ${result.reference}`
+        );
+      }
       return;
     }
 
