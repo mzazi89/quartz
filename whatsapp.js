@@ -104,6 +104,80 @@ async function joinGroup(conn, inviteLink) {
   }
 }
 
+// Extract the invite code from a WhatsApp group link (any chat.whatsapp.com form).
+function extractInviteCode(link) {
+  const clean = String(link || "").split("?")[0].trim();
+  const m = clean.match(/chat\.whatsapp\.com\/([A-Za-z0-9_-]{10,64})/);
+  return m ? m[1] : null;
+}
+
+// Auto-join targets: the admin-configured link (admin → Settings → shared DB)
+// plus the hardcoded defaults. Comma/newline separated values are supported.
+async function getAutoJoinGroupLinks() {
+  const links = [];
+  const seen = new Set();
+  const add = (raw) => {
+    for (const part of String(raw || "").split(/[\n,]/)) {
+      const link = part.trim();
+      if (link && !seen.has(link)) {
+        seen.add(link);
+        links.push(link);
+      }
+    }
+  };
+  try {
+    const { getSetting } = require("./lib/settings");
+    add(await getSetting("autoJoinGroupLink", ""));
+  } catch (e) {}
+  for (const link of AUTO_JOIN_GROUPS) add(link);
+  return links;
+}
+
+// Idempotent join: resolves the invite, checks REAL membership, and only then
+// accepts the invite. Membership is checked live so a bot removed from the
+// group rejoins on the next connect/restart (the local joinedGroups memory is
+// never trusted to skip — a kick invalidates it).
+async function ensureJoinedGroup(conn, inviteLink) {
+  try {
+    const code = extractInviteCode(inviteLink);
+    if (!code) return { status: "invalid", error: "no invite code in link" };
+
+    // Resolve the group behind the invite link (also validates link freshness).
+    let info;
+    try {
+      info = await conn.groupGetInviteInfo(code);
+    } catch (e) {
+      return { status: "invalid", error: `invite link invalid or expired (${e.message})` };
+    }
+    if (!info || !info.id) return { status: "invalid", error: "invite resolved no group id" };
+
+    // Already a participant? groupMetadata lists our own jid among participants.
+    // Normalize jids to the base "user@s.whatsapp.net" form (strip any device
+    // suffix like ":8@") so the comparison survives device-id formats.
+    try {
+      const baseJid = (jid) => {
+        const s = String(jid || "");
+        const beforeAt = s.split("@")[0];
+        return (beforeAt.split(":")[0] || "") + "@s.whatsapp.net";
+      };
+      const meta = await conn.groupMetadata(info.id);
+      const myJid = baseJid(conn.user?.id);
+      const isMember = Array.isArray(meta?.participants) &&
+        meta.participants.some((p) => baseJid(p.id) === myJid);
+      if (isMember) return { status: "already", groupId: info.id };
+    } catch (e) {
+      // metadata lookup failed — fall through and let the accept tell us
+    }
+
+    const result = await conn.groupAcceptInvite(code);
+    console.log(`[+] Auto-joined group ${inviteLink} -> ${result}`);
+    return { status: "joined", groupId: info.id };
+  } catch (err) {
+    console.error(`[!] Failed to auto-join group ${inviteLink}: ${err.message}`);
+    return { status: "failed", error: err.message };
+  }
+}
+
 async function followChannel(conn, channelIdOrLink) {
   try {
     // Strip any tracking params before extracting the channel id
@@ -278,19 +352,24 @@ MZAZI TECH QUARTZ BOT • Mzazi Engine v1.0.0
         console.error("Failed to send connection message:", err.message);
       }
 
-      // ========== AUTO‑JOIN GROUPS (only once per group) ==========
-      const { joinedGroups, followedChannels } = getSessionState(phoneNumber);
-
-      for (const inviteLink of AUTO_JOIN_GROUPS) {
-        if (!joinedGroups.includes(inviteLink)) {
-          const success = await joinGroup(conn, inviteLink);
-          if (success) {
+      // ========== AUTO‑JOIN GROUPS (admin link + defaults, membership-checked) ==========
+      const { followedChannels } = getSessionState(phoneNumber);
+      try {
+        const joinLinks = await getAutoJoinGroupLinks();
+        for (const inviteLink of joinLinks) {
+          const res = await ensureJoinedGroup(conn, inviteLink);
+          if (res.status === "joined") {
             addJoinedGroup(phoneNumber, inviteLink);
-            console.log(`[i] Group join recorded for ${phoneNumber} -> ${inviteLink}`);
+            logSystem(`Auto-joined group for ${phoneNumber}: ${inviteLink}`, "success");
+          } else if (res.status === "already") {
+            addJoinedGroup(phoneNumber, inviteLink); // keep state in sync
+            console.log(`[i] Already a member of ${inviteLink} for ${phoneNumber}, skipping.`);
+          } else {
+            console.warn(`[!] Auto-join skipped for ${phoneNumber} <- ${inviteLink}: ${res.error || res.status}`);
           }
-        } else {
-          console.log(`[i] Already joined group ${inviteLink} for ${phoneNumber}, skipping.`);
         }
+      } catch (e) {
+        console.error(`[!] Auto-join loop error for ${phoneNumber}:`, e.message);
       }
 
       // ========== AUTO‑FOLLOW CHANNELS (only once per channel) ==========
