@@ -2000,15 +2000,78 @@ const mzazireply = async (text, options = {}) => {
           `• ${key}: ${plan.name} — KES ${plan.price} / ${plan.days} days`
         )
         .join("\n");
-      await mzazireply(
+
+      const planRows = Object.entries(PLANS)
+        .filter(([, plan]) => plan.price > 0)
+        .map(([key, plan]) => ({
+          id: `${prefix}pay ${key}`,
+          title: `${key} — ${plan.name}`,
+          description: `KES ${plan.price} / ${plan.days} days — tap to pay`,
+        }));
+
+      const plansText =
         `💳 *MZAZI TECH QUARTZ PLANS*\n\n` +
         `🆓 FREE — 1 WhatsApp device\n` +
         `${planLines}\n\n` +
-        `Pay from WhatsApp with:\n` +
-        `• ${prefix}pay PLAN_5\n` +
-        `• ${prefix}pay 10\n\n` +
-        `After paying, use ${prefix}verify <reference>.`
-      );
+        `👇 Tap a plan below to pay instantly from WhatsApp.`;
+
+      try {
+        await sendInteractiveMessage(mzazi, sender, {
+          title: "💳 MZAZI TECH QUARTZ PLANS",
+          text: plansText,
+          footer: "⚡ Powered by MZAZI TECH INC",
+          interactiveButtons: [
+            {
+              name: "single_select",
+              buttonParamsJson: JSON.stringify({
+                title: "📂 SELECT YOUR PLAN",
+                sections: [
+                  {
+                    title: "PAID PLANS — 30 DAYS",
+                    rows: planRows,
+                  },
+                  {
+                    title: "START FREE",
+                    rows: [
+                      {
+                        id: `${prefix}pair`,
+                        title: "🆓 FREE — 1 WhatsApp device",
+                        description: `${prefix}pair 2547XXXXXXXX — start free, upgrade anytime`,
+                      },
+                    ],
+                  },
+                ],
+              }),
+            },
+            {
+              name: "quick_reply",
+              buttonParamsJson: JSON.stringify({
+                display_text: "📜 Menu",
+                id: prefix + "menu",
+              }),
+            },
+            {
+              name: "cta_url",
+              buttonParamsJson: JSON.stringify({
+                display_text: "🌐 mzazi.shop",
+                url: "https://mzazi.shop",
+              }),
+            },
+          ],
+        });
+      } catch (e) {
+        console.error("❌ PLANS MENU ERROR:", e?.message || e);
+        // Fallback: plain text so the command still answers
+        await mzazireply(
+          `💳 *MZAZI TECH QUARTZ PLANS*\n\n` +
+          `🆓 FREE — 1 WhatsApp device\n` +
+          `${planLines}\n\n` +
+          `Pay from WhatsApp with:\n` +
+          `• ${prefix}pay PLAN_5\n` +
+          `• ${prefix}pay 10\n\n` +
+          `After paying, use ${prefix}verify <reference>.`
+        );
+      }
     };
 
     // `.buy` (no plan arg) → QUARTZ XD main menu, as defined in the admin
@@ -2114,8 +2177,8 @@ const mzazireply = async (text, options = {}) => {
                 {
                     name: "quick_reply",
                     buttonParamsJson: JSON.stringify({
-                        display_text: "👑 Owner",
-                        id: prefix + "ownerhelp"
+                        display_text: "💳 QUARTZ PLANS",
+                        id: prefix + "plans"
                     })
                 },
                 {
@@ -2265,7 +2328,13 @@ const mzazireply = async (text, options = {}) => {
         `⏳ Validity: *${plan.days} days*\n` +
         `🔖 Reference: \`${result.reference}\`\n\n` +
         `Pay here:\n${result.url}\n\n` +
-        `After payment, send:\n${prefix}verify ${result.reference}`
+        `After payment, tap *Verify Payment* or send:\n${prefix}verify ${result.reference}`,
+        {
+          customButtons: [
+            { id: `${prefix}verify ${result.reference}`, text: "✅ Verify Payment" },
+            { id: `${prefix}menu`, text: "📜 Menu" },
+          ],
+        }
       );
       return;
     }
@@ -2299,7 +2368,13 @@ const mzazireply = async (text, options = {}) => {
         `📦 Plan: *${plan?.name || result.planKey}*\n` +
         `📱 Devices: *${plan?.maxDevices === 999 ? "Unlimited" : plan?.maxDevices}*\n` +
         `⏳ Validity: *${plan?.days || 30} days*\n\n` +
-        `You can now use ${prefix}pair 2547XXXXXXXX to connect a device.`
+        `You can now use ${prefix}pair 2547XXXXXXXX to connect a device.`,
+        {
+          customButtons: [
+            { id: `${prefix}pair`, text: "🔗 Pair Device" },
+            { id: `${prefix}menu`, text: "📜 Menu" },
+          ],
+        }
       );
       return;
     }
