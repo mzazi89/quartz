@@ -2011,6 +2011,135 @@ const mzazireply = async (text, options = {}) => {
       );
     };
 
+    // `.buy` (no plan arg) → QUARTZ XD main menu, as defined in the admin
+    // registry (bot_commands.buy). Kept as a local function because `buy` is an
+    // engine command — the bot must show this without a registry re-import.
+    const sendWhatsappBuyMenu = async () => {
+      try {
+
+        // ── Menu banner + picture ──
+        const bCustomPic = `./database/sessions/${botPhoneNum}/menu.jpg`;
+        const bDefaultPic = "./media/menu.jpg";
+        const bPicPath = fs.existsSync(bCustomPic) ? bCustomPic : bDefaultPic;
+        const bUpSec = Math.floor((Date.now() - startTime) / 1000);
+        const bUpStr = Math.floor(bUpSec / 86400) + 'd ' + Math.floor((bUpSec % 86400) / 3600) + 'h ' + Math.floor((bUpSec % 3600) / 60) + 'm ' + (bUpSec % 60) + 's';
+        const bNow = new Date();
+        const bTimeStr = bNow.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        const bDateStr = bNow.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const bPushName = (m && m.pushName) || 'User';
+        let bMode = '🌐 PUBLIC';
+        try { const _s = loadJSON(settingsPath, { selfMode: false }); if (_s.selfMode) bMode = '🔒 SELF'; } catch (e) {}
+
+        const bannerTxt =
+            "╔═════════════╗\n" +
+            "║➥✦ QUARTZ XD ✦\n" +
+            "╠═════════════╣\n" +
+            "║➥┌──────────┐\n" +
+            "║➥│ 👤 USER    : " + bPushName + "\n" +
+            "║➥│ 📱 NUMBER  : " + botPhoneNum + "\n" +
+            "║➥│ ⏱ UPTIME  : " + bUpStr + "\n" +
+            "║➥│ 🕐 TIME    : " + bTimeStr + "\n" +
+            "║➥│ 📅 DATE    : " + bDateStr + "\n" +
+            "║➥│ 📌 VERSION : 3.2.1\n" +
+            "║➥│ ⚙️ MODE    : " + bMode + "\n" +
+            "║➥│ 🔱 PREFIX  : " + prefix + "\n" +
+            "║➥│ OWNER     : MZAZI TECH\n" +
+            "║➥└──────────┘\n" +
+            "╚═════════════╝";
+
+        await sendInteractiveMessage(mzazi, sender, {
+            title: "MZAZI TECH INC",
+            text: bannerTxt + '\n\n' + "👋 Welcome to QUARTZ XD\n\nSelect a category from the menu below:",
+            footer: "⚡ Powered by MZAZI TECH INC",
+            ...(fs.existsSync(bPicPath) ? { image: { buffer: fs.readFileSync(bPicPath) } } : {}),
+            interactiveButtons: [
+                {
+                    name: "single_select",
+                    buttonParamsJson: JSON.stringify({
+                        title: "📂 SELECT CATEGORY",
+                        sections: [
+                            {
+                                title: "MAIN CATEGORIES",
+                                rows: [
+                                    {
+                                        id: prefix + "generalmenu",
+                                        title: "🤖 General",
+                                        description: prefix + "generalmenu — Core and everyday commands"
+                                    },
+                                    {
+                                        id: prefix + "aimenu",
+                                        title: "🧠 AI",
+                                        description: prefix + "aimenu — Chat, images, translation and more"
+                                    },
+                                    {
+                                        id: prefix + "mediamenu",
+                                        title: "📥 Downloads",
+                                        description: prefix + "mediamenu — Music and video downloads"
+                                    },
+                                    {
+                                        id: prefix + "groupmenu",
+                                        title: "👥 Group",
+                                        description: prefix + "groupmenu — Group management"
+                                    },
+                                    {
+                                        id: prefix + "protectionmenu",
+                                        title: "🛡️ Protection",
+                                        description: prefix + "protectionmenu — Anti-spam group protections"
+                                    }
+                                ]
+                            },
+                            {
+                                title: "MORE",
+                                rows: [
+                                    {
+                                        id: prefix + "ownermenu",
+                                        title: "👑 Owner",
+                                        description: prefix + "ownermenu — Owner-only utilities"
+                                    },
+                                    {
+                                        id: prefix + "gamemenu",
+                                        title: "🎮 Games",
+                                        description: prefix + "gamemenu — Games and quizzes"
+                                    },
+                                    {
+                                        id: prefix + "funmenu",
+                                        title: "😂 Fun",
+                                        description: prefix + "funmenu — Jokes, quotes and fun"
+                                    }
+                                ]
+                            }
+                        ]
+                    })
+                },
+                {
+                    name: "quick_reply",
+                    buttonParamsJson: JSON.stringify({
+                        display_text: "👑 Owner",
+                        id: prefix + "ownerhelp"
+                    })
+                },
+                {
+                    name: "cta_url",
+                    buttonParamsJson: JSON.stringify({
+                        display_text: "🌐 mzazi.shop",
+                        url: "https://mzazi.shop"
+                    })
+                }
+            ]
+        });
+
+      } catch (e) {
+        console.error("❌ MENU ERROR:", e);
+        await mzazi.sendMessage(
+            sender,
+            {
+                text: '❌ Menu error: ' + (e.message || e)
+            },
+            { quoted: m }
+        );
+      }
+    };
+
     if (isPairingCommand) {
       if (isGroup) {
         await mzazireply("❌ Pairing and payment commands are available in a private chat only.");
@@ -2094,6 +2223,11 @@ const mzazireply = async (text, options = {}) => {
     if (isPlansCommand || (isPaymentCommand && !args[0])) {
       if (isGroup) {
         await mzazireply("❌ Plans and payment commands are available in a private chat only.");
+        return;
+      }
+      // `.buy` with no plan arg → the QUARTZ XD main menu (admin-defined).
+      if (whatsappCommand === "buy") {
+        await sendWhatsappBuyMenu();
         return;
       }
       await sendWhatsappPlans();
