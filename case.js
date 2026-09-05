@@ -18,6 +18,7 @@ const { validatePhoneNumber } = require("./helper/generate.js");
 const logger = require("./helper/logger.js");
 const { logSystem } = require('./helper/logger.js'); // Adjust path as needed
 const { logIncomingMessage, logGroupCommand } = require("./lib/chatLogger");
+const waPanel = require("./lib/waPanel.js"); // WhatsApp panel reseller flow (.panel/.unlimited)
 const { syncRemoteCommands, getRemoteCommand, listRemoteCommands, runRemoteCommand, getRemoteStatus } = require("./lib/remoteCommands.js");
 const { handleGroupLockEvent } = require("./lib/groupLock.js");
 const { getMzaziApiKey, getSetting } = require("./lib/settings");
@@ -1604,6 +1605,21 @@ You:`.trim();
       }
     }
 
+    // ── WhatsApp PANEL reseller: capture plain-text replies to a pending
+    //    "client details" prompt (must run before the chatbot so an AI reply
+    //    can't swallow the client's username/phone).
+    if (!isGroup && waPanel.hasPending(sender)) {
+      if (isCmd) {
+        // A new command while an order is pending = new intent: drop the stale
+        // order, except .panel/.unlimited/.cancel which manage it themselves.
+        const c = command || "";
+        if (c !== "panel" && c !== "unlimited" && c !== "cancel") waPanel.clearPending(sender);
+      } else if (budy && budy.trim()) {
+        const consumed = await waPanel.handlePlainInput({ mzazi, sender, budy, senderPhone: senderNumber, prefix });
+        if (consumed) return;
+      }
+    }
+
     await handleChatbotResponse();
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -2411,6 +2427,21 @@ const mzazireply = async (text, options = {}) => {
         }
       );
       return;
+    }
+
+    // ── WhatsApp PANEL reseller commands: .panel / .unlimited ────────────────
+    // (Activation, size menu, automatic Pterodactyl provisioning — see lib/waPanel.js)
+    {
+      const panelHandled = await waPanel.handleCommand({
+        mzazi,
+        sender,
+        isGroup,
+        command,
+        args,
+        prefix,
+        senderPhone: senderNumber,
+      });
+      if (panelHandled) return;
     }
 
     // ── Command dispatch ───────────────────────────────────────────────────────
