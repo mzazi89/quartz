@@ -11,6 +11,8 @@
     "db:push": "npx prisma db push",
     "db:migrate": "npx prisma migrate deploy",
     "db:studio": "npx prisma studio",
+    "seed:xmd": "node scripts/seed-xmd-commands.js",
+    "seed:xmd:apply": "node scripts/seed-xmd-commands.js --apply",
     "postinstall": "npx prisma generate"
   },
   "overrides": {

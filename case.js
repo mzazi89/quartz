@@ -11,6 +11,7 @@ const baileys = require("@whiskeysockets/baileys");
 const { sendButtons, sendInteractiveMessage } = require("gifted-btns");
 const { exec } = require("child_process");
 const fetch = global.fetch || require("node-fetch");
+const profiles = require("./lib/profiles");
 const { loadJSON, saveJSON, runtime, formatBytes } = require("./helper/function.js");
 const config = require("./settings.js");
 const { requestPairingCode } = require("./whatsapp.js");
@@ -3691,6 +3692,22 @@ const mzazireply = async (text, options = {}) => {
       sendInteractiveMessage,
     });
 
+    // ── Which bot is this? ─────────────────────────────────────────────────────
+    // On the WhatsApp side there is no Telegram user to ask, so the session that
+    // received the message decides — an XMD device speaks XMD's commands. That is
+    // the correct answer, and it is the only signal available.
+    //
+    // Wrapped defensively on purpose: if the session number cannot be resolved,
+    // this falls back to the primary profile instead of throwing. An exception
+    // here would take out every imported command at once, which is a far worse
+    // failure than a command appearing on the wrong bot.
+    let profileId = null;
+    try {
+      profileId = profiles.forSession(botPhoneNum);
+    } catch (e) {
+      profileId = null;
+    }
+
     if (command === "synccmd" || command === "sync") {
       if (!isOwner) return mzazireply("❌ Owner only.");
       await mzazireply("⏳ Importing commands from the shared database...");
@@ -3704,8 +3721,8 @@ const mzazireply = async (text, options = {}) => {
       if (!status.keyConfigured) {
         return mzazireply('❌ DATABASE_URL is not set — the bot cannot import commands from the shared Neon database.');
       }
-      const list = listRemoteCommands();
-      if (list.length === 0) return mzazireply(`📭 No remote commands yet.\n\nSync with: ${prefix}synccmd`);
+      const list = listRemoteCommands(profileId);
+      if (list.length === 0) return mzazireply(`📭 No commands for this bot yet.\n\nSync with: ${prefix}synccmd`);
       const lines = list.map((c) => `• ${prefix}${c.name}${c.ownerOnly ? " 🔒" : ""} — ${c.description}`).join("\n");
       return mzazireply(
         `🌐 *Remote Commands* (${list.length})\n\n${lines}\n\n` +
@@ -3716,7 +3733,9 @@ const mzazireply = async (text, options = {}) => {
 
     // ── Imported command execution ─────────────────────────────────────────────
     if (command) {
-      const remoteCmd = getRemoteCommand(command);
+      // Scoped to this bot's profile, so QUARTZ XD and MZAZI XMD answer to
+      // entirely different command sets from the one registry.
+      const remoteCmd = getRemoteCommand(command, profileId);
       if (remoteCmd) {
         // ── GROUP LOCK (lockgc) ───────────────────────────────────────────
         // While a group is locked, block admin changes + mass removal for
