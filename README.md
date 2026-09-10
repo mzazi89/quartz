@@ -161,6 +161,64 @@ would make WhatsApp reject the link.
 
 ---
 
+## Two bots from one process — QUARTZ XD and MZAZI XMD
+
+One Node process and **one Telegram bot** can serve more than one WhatsApp
+identity. What separates them is **which paired numbers they own**: a profile is
+recorded on every pairing and checked on anything that touches a number.
+
+Set it on the admin **Settings** page:
+
+```jsonc
+// settings.key = 'bot_profiles'
+[{"id":"quartz","name":"QUARTZ XD"},{"id":"xmd","name":"MZAZI XMD"}]
+```
+
+The first time a user runs a command, a **button appears to choose between them**;
+`/bot` re-opens it. Each bot then answers only its own command set — MZAZI XMD's
+download and media commands do not exist on QUARTZ XD, and vice versa.
+
+> **With `bot_profiles` unset there is exactly ONE bot and nothing changes.**
+> Every existing entry in `paired.json` has no profile field and is assigned to
+> that one profile, so filtering is a no-op and every code path behaves exactly as
+> it did before this feature existed. Switching it on is a settings change; so is
+> switching it back.
+
+### Pairing from the website
+
+The linking site ([mzazi89/link](https://github.com/mzazi89/link)) has no Telegram
+user to ask, so it names its bot **in the queue row**:
+
+```sql
+INSERT INTO bot_control (action, bot_id, payload, status)
+VALUES ('pair', 'xmd', '{"number":"254741388986","password_hash":"scrypt$…"}', 'pending');
+```
+
+- `bot_id` is new, with an `ALTER … IF NOT EXISTS` for databases that predate it.
+  An empty value means *any bot may take it*, so old rows stay claimable.
+- **The claim filters on it.** A request naming a bot this process does not serve
+  stays `pending` rather than being claimed by the other one — for WhatsApp that
+  is not a mistake anyone can quietly undo, because the code would be issued
+  against the wrong session and nothing on the page would say so.
+- The claimed target is carried into the pairing, so the device is recorded under
+  the bot the user picked rather than whatever profile the operator last chose in
+  Telegram. `database/pending-profiles.json` holds it between "code issued" and
+  "code entered" — a restart in that window is entirely possible on Pterodactyl —
+  and it is **read-and-cleared**, so a leftover entry can never influence a later,
+  unrelated pairing of the same number.
+
+### One heartbeat row per bot
+
+`bot_status` is keyed by `bot_id`, and the heartbeat writes **one row per served
+profile**, each carrying only that profile's `session_numbers` and
+`devices_meta`. It previously wrote a single row called `'main'`, which meant a
+second bot **overwrote** the first rather than appearing beside it.
+
+A row for a profile that is no longer configured is simply left alone and ages
+out; the website reads only the bots it is configured with, so it is ignored.
+
+---
+
 ## Architecture
 
 ```
@@ -171,6 +229,10 @@ settings.js           ← Config — MODIFIED (added Paystack, DB, plans)
 server.js             ← Express webhook server — NEW
 lib/
   prismaClient.js     ← Prisma singleton — NEW
+  profiles.js         ← Bot profiles: QUARTZ XD / MZAZI XMD, and the pairing target
+  botDb.js            ← Shared Neon client + the bot_control/bot_status DDL
+  botTelemetry.js     ← Per-bot heartbeat, control queue, registry watcher
+  remoteCommands.js   ← Command registry from the website, scoped per bot
   subscription.js     ← Subscription logic — NEW
   payment.js          ← Paystack integration — NEW
   admin.js            ← Admin panel functions — NEW

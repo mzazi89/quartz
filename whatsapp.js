@@ -300,9 +300,10 @@ async function connectToWhatsApp(phoneNumber, telegramUserId) {
         sessions.push({
           number: phoneNumber,
           userId: telegramUserId,
-          // Which bot this device belongs to. See the note on the other push
-          // below — a re-link keeps the profile it already had.
-          profile: profiles.forUser(telegramUserId),
+          // Which bot this device belongs to. A pairing started from the website
+          // named its bot when the request was queued and left it pending; one
+          // started from Telegram knows from the user's choice.
+          profile: profiles.takePendingProfile(phoneNumber) || profiles.forUser(telegramUserId),
           active: true,
           createdAt: Date.now()
         });
@@ -593,14 +594,15 @@ async function requestPairingCode(phoneNumber, telegramUserId, options = {}) {
         sessions.push({
           number: phoneNumber,
           userId: telegramUserId,
-          // Which bot this device belongs to, resolved from the Telegram user's
-          // current choice at the moment the link actually succeeds.
+          // Which bot this device belongs to, resolved at the moment the link
+          // actually succeeds: the target named by whichever request started it
+          // (the website states one; Telegram takes the user's choice).
           //
           // A re-link of a number that is already recorded deliberately does NOT
           // change its profile — the branch above only flips `active`. Silently
           // moving a device between bots would be worse than leaving it where
           // its owner last saw it; changing bots is a deliberate act.
-          profile: profiles.forUser(telegramUserId),
+          profile: profiles.takePendingProfile(phoneNumber) || profiles.forUser(telegramUserId),
           active: true,
           createdAt: Date.now()
         });
