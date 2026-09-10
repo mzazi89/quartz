@@ -9,6 +9,7 @@ const { logTelegram, logBanner, logSystem } = require('./helper/logger');
 const { syncRemoteCommands } = require('./lib/remoteCommands');
 const botTelemetry = require('./lib/botTelemetry');
 const config = require('./settings');
+const profiles = require('./lib/profiles');
 
 // ── Remote command registry sync (mzazi.shop/api/bot-command) ────────────────
 // Syncs the website-defined commands at boot, every 30 minutes, and
@@ -561,21 +562,38 @@ const mainKeyboard = {
 
 // ─── My Devices handler ─────────────────────────────────────────────────────
 async function handleMyDevices(bot, chatId, userId) {
+  // Ask which bot first, once. Without this a user who has never chosen would
+  // have their device list silently scoped to the primary profile and would see
+  // numbers "missing" with no explanation.
+  if (profiles.enabled() && !profiles.hasChosen(userId)) {
+    return bot.sendMessage(chatId, profiles.chooserText(userId), {
+      parse_mode: 'HTML',
+      reply_markup: profiles.keyboard(),
+    });
+  }
+
   const sessions = getUserSessions(userId);
   const { maxDevices, deviceCount } = await getSubStatus(userId);
 
   if (sessions.length === 0) {
     return bot.sendMessage(
       chatId,
-      '📭 <b>No devices paired yet.</b>\n\nUse /pair [number] to pair your first device.',
+      `📭 <b>No devices on ${profiles.labelForUser(userId)}.</b>\n\n` +
+        'Use /pair [number] to pair one, or /bot to switch bot.',
       { parse_mode: 'HTML' }
     );
   }
 
+  // Devices here are only this bot's. `Slots used` is deliberately the whole
+  // account, because subscription limits must not change meaning just because a
+  // second bot was switched on — billing is a business decision, not a side
+  // effect of this feature. The two numbers differing is correct, not a bug.
   let text = `
 <b>📲 My Devices</b>
 
-Slots: ${deviceCount} / ${maxDevices === 999 ? '∞' : maxDevices}
+🤖 Bot: <b>${profiles.labelForUser(userId)}</b>
+📱 Devices on this bot: ${sessions.length}
+🎚️ Slots used: ${deviceCount} / ${maxDevices === 999 ? '∞' : maxDevices}
 
 `.trim() + '\n\n';
 
@@ -965,6 +983,29 @@ Press <b>Upgrade Plan</b> to subscribe.
     const data = query.data;
 
     bot.answerCallbackQuery(query.id).catch(() => {});
+
+    // ─── 🤖 Bot profile choice ─────────────────────────────────────────────────
+    // Tapping a profile button. Placed first so the answerCallbackQuery above has
+    // already cleared the button's spinner by the time anything else runs.
+    if (data.startsWith('prof:')) {
+      const chosen = profiles.byId(data.slice('prof:'.length));
+
+      if (!chosen) {
+        return bot.sendMessage(chatId, '❌ That bot is no longer configured.');
+      }
+
+      profiles.setForUser(userId, chosen.id);
+
+      const mine = getUserSessions(userId);
+      return bot.sendMessage(
+        chatId,
+        `🤖 Now working in <b>${chosen.name}</b>.\n\n` +
+          (mine.length
+            ? `This bot holds <b>${mine.length}</b> of your device(s).`
+            : 'No devices paired to this bot yet — use /pair [number].'),
+        { parse_mode: 'HTML' }
+      );
+    }
 
     // ─── ➕ Add Server (buttons) ───────────────────────────────────────────────
     if (data.startsWith('add_')) {
@@ -1423,6 +1464,16 @@ Manual check: /verify ${result.reference}
     const userId = msg.from.id;
     const phoneNumber = match[1];
 
+    // Which bot is this pairing for? Asked before anything is generated, because
+    // a code issued for one bot cannot be re-homed to the other — the choice has
+    // to be made up front, not corrected afterwards.
+    if (profiles.enabled() && !profiles.hasChosen(userId)) {
+      return bot.sendMessage(chatId, profiles.chooserText(userId), {
+        parse_mode: 'HTML',
+        reply_markup: profiles.keyboard(),
+      });
+    }
+
     if (settings.premiumOnly && !isOwner(userId)) {
       const { effectivePlan } = await getSubStatus(userId);
       if (effectivePlan === 'FREE') {
@@ -1513,6 +1564,18 @@ Valid for 1 hour.
       return bot.sendMessage(chatId, '❌ Session not found or no permission.');
     }
 
+    // Ownership is not enough here. An owner can see every profile, so without
+    // this check they could delete another bot's device believing they were in
+    // the one on screen — and deletion wipes the session folder.
+    if (!profiles.owns(currentSessions[sessionIndex], userId)) {
+      const owner = profiles.byId(profiles.profileOf(currentSessions[sessionIndex]));
+      return bot.sendMessage(
+        chatId,
+        `❌ That device belongs to <b>${owner ? owner.name : 'another bot'}</b>.\n\nSwitch with /bot first.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
     const sessionPath = `./database/sessions/${validNumber}`;
     if (fs.existsSync(sessionPath)) {
       fs.rmSync(sessionPath, { recursive: true, force: true });
@@ -1576,6 +1639,25 @@ Valid for 1 hour.
     text += `<b>Total:</b> ${userSessions.length}`;
 
     bot.sendMessage(chatId, text, { parse_mode: 'HTML' });
+  });
+
+  // ─── /bot — choose which bot to work with ──────────────────────────────────
+  bot.onText(/\/bot\b/, async (msg) => {
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+
+    if (!profiles.enabled()) {
+      return bot.sendMessage(
+        chatId,
+        `🤖 Only one bot is configured: <b>${profiles.primary().name}</b>.`,
+        { parse_mode: 'HTML' }
+      );
+    }
+
+    bot.sendMessage(chatId, profiles.chooserText(userId), {
+      parse_mode: 'HTML',
+      reply_markup: profiles.keyboard(),
+    });
   });
 
   // ─── /mydevices ────────────────────────────────────────────────────────────

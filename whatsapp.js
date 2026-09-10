@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const NodeCache = require("node-cache");
 const { loadJSON, saveJSON } = require("./helper/function");
+const profiles = require("./lib/profiles");
 const { logSystem } = require("./helper/logger");
 const config = require("./settings");
 
@@ -299,6 +300,9 @@ async function connectToWhatsApp(phoneNumber, telegramUserId) {
         sessions.push({
           number: phoneNumber,
           userId: telegramUserId,
+          // Which bot this device belongs to. See the note on the other push
+          // below — a re-link keeps the profile it already had.
+          profile: profiles.forUser(telegramUserId),
           active: true,
           createdAt: Date.now()
         });
@@ -589,6 +593,14 @@ async function requestPairingCode(phoneNumber, telegramUserId, options = {}) {
         sessions.push({
           number: phoneNumber,
           userId: telegramUserId,
+          // Which bot this device belongs to, resolved from the Telegram user's
+          // current choice at the moment the link actually succeeds.
+          //
+          // A re-link of a number that is already recorded deliberately does NOT
+          // change its profile — the branch above only flips `active`. Silently
+          // moving a device between bots would be worse than leaving it where
+          // its owner last saw it; changing bots is a deliberate act.
+          profile: profiles.forUser(telegramUserId),
           active: true,
           createdAt: Date.now()
         });

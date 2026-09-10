@@ -13,6 +13,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const staticConfig = {
   botName: "MZAZI TECH QUARTZ BOT",
+
+  // Bot profiles — several WhatsApp identities served by this one process and
+  // one Telegram bot (see lib/profiles.js). Empty means a single profile, no
+  // chooser, and exactly the behaviour that existed before profiles did.
+  //
+  // Set the `bot_profiles` key on the admin Settings page to turn it on:
+  //   [{"id":"quartz","name":"QUARTZ XD"},{"id":"xmd","name":"MZAZI XMD"}]
+  botProfiles: process.env.BOT_PROFILES || "",
+
   owner: "Mrs Mzazi",
 
   // Remote command registry — commands are exported from the website
@@ -112,6 +121,7 @@ const staticConfig = {
 // DB key (admin Settings page) → config key, with optional coercion.
 const DB_KEY_MAP = [
   ['bot_name',             'botName'],
+  ['bot_profiles',         'botProfiles'],
   ['owner',                'owner'],
   ['telegram_owner',       'telegramOwner',    Number],
   ['whatsapp_owner',       'whatsappOwner'],
