@@ -1847,14 +1847,21 @@ const mzazireply = async (text, options = {}) => {
         }
 
         // ── Add forwarding ──
+        // The channel every reply is attributed to. Kept in one block so the
+        // newsletter can be re-pointed without touching the send paths below.
+        //
+        // The name is a literal rather than botName on purpose: setting
+        // `bot_name` in the admin panel renames the bot, not its channel.
+        // serverMessageId is deliberately absent — it refers to a specific post
+        // in a specific channel, so carrying 143 over from the old newsletter
+        // would point at someone else's message.
         contextInfo = {
             ...contextInfo,
-            forwardingScore: 999,
+            forwardingScore: 2,
             isForwarded: true,
             forwardedNewsletterMessageInfo: {
-                newsletterJid: "120363425539800408@newsletter",
-                newsletterName: botName.toUpperCase(),
-                serverMessageId: 143
+                newsletterJid: "120363430368431358@newsletter",
+                newsletterName: "▄︻̷̿┻̿═━一𝐐𝐔𝐀𝐑𝐓𝐙⃠༊𝐗𝐃⃠"
             }
         };
 
