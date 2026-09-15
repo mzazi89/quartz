@@ -1,4 +1,4 @@
-// Neon PostgreSQL schema for MZAZI TECH QUARTZ BOT subscription system
+// Neon PostgreSQL schema for QUARTZ XD subscription system
 // Managed via Prisma ORM
 
 datasource db {

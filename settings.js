@@ -12,7 +12,7 @@
 // (DATABASE_URL stays in the server env on purpose — never stored in the DB.)
 // ─────────────────────────────────────────────────────────────────────────────
 const staticConfig = {
-  botName: "MZAZI TECH QUARTZ BOT",
+  botName: "QUARTZ XD",
 
   // Bot profiles — several WhatsApp identities served by this one process and
   // one Telegram bot (see lib/profiles.js). Empty means a single profile, no
@@ -85,7 +85,7 @@ const staticConfig = {
   // XMD side (electric blue + rounded banners); this bot's look is unchanged on
   // purpose, so nobody already using it sees it change.
   theme: {
-    name: "MZAZI TECH QUARTZ BOT",
+    name: "QUARTZ XD",
     mode: "DARK",
     primaryColor: "#007BFF",
     secondaryColor: "#FFFFFF",
@@ -94,7 +94,37 @@ const staticConfig = {
     accentColor2: "#00ffaa",             // gradient partner on generated cards
     cardBg: ["#051810", "#0c3820", "#051810"],
     badge: "🟢",                         // emoji signature on every reply footer
-    bannerStyle: "double"                // ╔══╗ — unchanged for this bot
+    bannerStyle: "double",               // ╔══╗ — unchanged for this bot
+
+    // Response voice. "classic" draws this bot's replies exactly as they were —
+    // the swap table is empty, so nothing rewrites this bot's wording. MZAZI XMD
+    // declares "xmd", which is where the two bots' actual answer text diverges.
+    responseStyle: "classic",
+
+    // Top-level menu categories. This is this bot's shipped list, moved here out
+    // of case.js so the two bots can declare different menus instead of sharing
+    // one hard-coded structure. `id` is prefixed with the bot's prefix at render
+    // time and must resolve to a real command in this bot's registry.
+    categories: [
+      {
+        title: "MAIN CATEGORIES",
+        rows: [
+          { id: "generalmenu",    title: "🤖 General",    desc: "Core and everyday commands" },
+          { id: "aimenu",         title: "🧠 AI",         desc: "Chat, images, translation and more" },
+          { id: "mediamenu",      title: "📥 Downloads",  desc: "Music and video downloads" },
+          { id: "groupmenu",      title: "👥 Group",      desc: "Group management" },
+          { id: "protectionmenu", title: "🛡️ Protection", desc: "Anti-spam group protections" }
+        ]
+      },
+      {
+        title: "MORE",
+        rows: [
+          { id: "ownermenu", title: "👑 Owner",  desc: "Owner-only utilities" },
+          { id: "gamemenu",  title: "🎮 Games",  desc: "Games and quizzes" },
+          { id: "funmenu",   title: "😂 Fun",    desc: "Jokes, quotes and fun" }
+        ]
+      }
+    ]
   },
 
   fonts: {

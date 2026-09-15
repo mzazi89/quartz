@@ -131,7 +131,7 @@ async function generateWelcomeImage({ memberNumber, groupName, memberCount, prof
   const canvas = _createCanvas(W, H);
   const ctx = canvas.getContext("2d");
   const A = theme.accent, A2 = theme.accent2;
-  const botName = config.botName || "MZAZI TECH QUARTZ BOT";
+  const botName = config.botName || "QUARTZ XD";
 
   const bg = ctx.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, theme.background[0]); bg.addColorStop(0.5, theme.background[1]); bg.addColorStop(1, theme.background[2]);
@@ -199,7 +199,7 @@ async function generateGoodbyeImage({ memberNumber, groupName, profilePicUrl }) 
   const canvas = _createCanvas(W, H);
   const ctx = canvas.getContext("2d");
   const A = "#e94560", A2 = "#ff6b8a";
-  const botName = config.botName || "MZAZI TECH QUARTZ BOT";
+  const botName = config.botName || "QUARTZ XD";
 
   const bg = ctx.createLinearGradient(0, 0, W, H);
   bg.addColorStop(0, "#0e0c1e"); bg.addColorStop(0.5, "#1a1438"); bg.addColorStop(1, "#0e0c1e");
@@ -263,7 +263,7 @@ async function generateEventImage({ memberNumber, eventType, groupName, details 
   const W = 800, H = 540;
   const canvas = _createCanvas(W, H);
   const ctx = canvas.getContext("2d");
-  const botName = config.botName || "MZAZI TECH QUARTZ BOT";
+  const botName = config.botName || "QUARTZ XD";
 
   const THEMES = {
     promote:     { bg:["#120a28","#261650","#120a28"], A:"#f0c040", A2:"#ffd700", badge:"👑   PROMOTED TO ADMIN",    title:"PROMOTED!" },
@@ -365,7 +365,7 @@ async function handleGroupParticipantsUpdate(mzazi, update) {
       try { profilePicUrl = await mzazi.profilePictureUrl(participantJid, "image"); } catch {}
 
       if (action === "add" && gs.welcome) {
-        const caption = theme.ornament(
+        const caption = theme.restyle(
           `╔════════════════════╗\n║   🎉 *WELCOME* 🎉   ║\n╚════════════════════╝\n\n` +
           `✨ @${memberNumber} just joined!\n\n📌 *Group:* ${groupName}\n👥 *Total Members:* ${memberCount}\n\n_We are so glad to have you here!_ 🌟`);
         try {
@@ -376,7 +376,7 @@ async function handleGroupParticipantsUpdate(mzazi, update) {
       }
 
       else if (action === "remove" && gs.goodbye) {
-        const caption = theme.ornament(
+        const caption = theme.restyle(
           `╔════════════════════╗\n║   🌙 *GOODBYE* 🌙   ║\n╚════════════════════╝\n\n` +
           `💔 @${memberNumber} has left.\n\n📌 *Group:* ${groupName}\n\n_Thank you for being with us. Until we meet again..._ 🌠`);
         try {
@@ -387,7 +387,7 @@ async function handleGroupParticipantsUpdate(mzazi, update) {
       }
 
       else if (action === "promote" && gs.events) {
-        const caption = theme.ornament(
+        const caption = theme.restyle(
           `╔════════════════════╗\n║  👑 *PROMOTED!* 👑  ║\n╚════════════════════╝\n\n` +
           `⭐ @${memberNumber} has been promoted!\n🎖️ *New Role:* Admin\n\n📌 *Group:* ${groupName}\n\n_Congratulations! 🎉_`);
         try {
@@ -398,7 +398,7 @@ async function handleGroupParticipantsUpdate(mzazi, update) {
       }
 
       else if (action === "demote" && gs.events) {
-        const caption = theme.ornament(
+        const caption = theme.restyle(
           `╔════════════════════╗\n║  📉 *DEMOTED* 📉   ║\n╚════════════════════╝\n\n` +
           `@${memberNumber} has been demoted.\n🔻 *Admin rights removed*\n\n📌 *Group:* ${groupName}`);
         try {
@@ -424,7 +424,7 @@ async function handleGroupsUpdateEvent(mzazi, updates) {
       try { const meta = await mzazi.groupMetadata(groupJid); groupName = meta.subject || groupJid; } catch {}
 
       if (update.subject !== undefined) {
-        const caption = theme.ornament(`╔════════════════════╗\n║  ✏️ *RENAMED* ✏️   ║\n╚════════════════════╝\n\n📌 Group name changed to:\n*${update.subject}*`);
+        const caption = theme.restyle(`╔════════════════════╗\n║  ✏️ *RENAMED* ✏️   ║\n╚════════════════════╝\n\n📌 Group name changed to:\n*${update.subject}*`);
         try {
           const img = await generateEventImage({ memberNumber: "", eventType: "subject", groupName: update.subject, details: `Was: ${groupName}` });
           if (img) await mzazi.sendMessage(groupJid, { image: img, caption });
@@ -433,7 +433,7 @@ async function handleGroupsUpdateEvent(mzazi, updates) {
       }
 
       if (update.desc !== undefined) {
-        const caption = theme.ornament(`╔════════════════════╗\n║  📝 *INFO UPDATE* 📝║\n╚════════════════════╝\n\n📌 *Group:* ${groupName}\n\nNew description:\n_${_truncate(update.desc, 200)}_`);
+        const caption = theme.restyle(`╔════════════════════╗\n║  📝 *INFO UPDATE* 📝║\n╚════════════════════╝\n\n📌 *Group:* ${groupName}\n\nNew description:\n_${_truncate(update.desc, 200)}_`);
         try {
           const img = await generateEventImage({ memberNumber: "", eventType: "description", groupName, details: _truncate(update.desc, 60) });
           if (img) await mzazi.sendMessage(groupJid, { image: img, caption });
@@ -678,7 +678,7 @@ module.exports = async (mzazi, m) => {
         // This handler's banner styling, in one place: every caption below is
         // routed through this bot's ornament set (MZAZI XMD draws rounded
         // corners, QUARTZ XD keeps its double lines).
-        caption = theme.ornament(caption);
+        caption = theme.restyle(caption);
         try {
           if (imgBuf) {
             await mzazi.sendMessage(_stubGrp, { image: imgBuf, caption, mentions });
@@ -1824,7 +1824,7 @@ const mzazireply3 = async (caption, options = {}) => {
 };
 const mzazireply27 = async (text) => {
     return await sendButtonMessage(mzazi, sender, {
-        text: theme.ornament(text),
+        text: theme.restyle(text),
         footer: theme.signatureUpper,
         buttons: [
             { id: ".menu", text: "📜 MENU" },
@@ -1842,7 +1842,7 @@ const mzazireply = async (text, options = {}) => {
         // banner ornaments are swapped for this bot's set (MZAZI XMD draws
         // rounded corners, QUARTZ XD keeps its double lines) and the footer
         // carries this bot's own name and badge.
-        text = theme.ornament(text);
+        text = theme.restyle(text);
 
         const {
             quoted = null,
@@ -2059,14 +2059,14 @@ const mzazireply = async (text, options = {}) => {
         }));
 
       const plansText =
-        `💳 *MZAZI TECH QUARTZ PLANS*\n\n` +
+        `💳 *QUARTZ XD PLANS*\n\n` +
         `🆓 FREE — 1 WhatsApp device\n` +
         `${planLines}\n\n` +
         `👇 Tap a plan below to pay instantly from WhatsApp.`;
 
       try {
         await sendInteractiveMessage(mzazi, sender, {
-          title: "💳 MZAZI TECH QUARTZ PLANS",
+          title: "💳 QUARTZ XD PLANS",
           text: plansText,
           footer: "⚡ Powered by MZAZI TECH INC",
           interactiveButtons: [
@@ -2112,7 +2112,7 @@ const mzazireply = async (text, options = {}) => {
         console.error("❌ PLANS MENU ERROR:", e?.message || e);
         // Fallback: plain text so the command still answers
         await mzazireply(
-          `💳 *MZAZI TECH QUARTZ PLANS*\n\n` +
+          `💳 *QUARTZ XD PLANS*\n\n` +
           `🆓 FREE — 1 WhatsApp device\n` +
           `${planLines}\n\n` +
           `Pay from WhatsApp with:\n` +
@@ -2142,7 +2142,7 @@ const mzazireply = async (text, options = {}) => {
         let bMode = '🌐 PUBLIC';
         try { const _s = loadJSON(settingsPath, { selfMode: false }); if (_s.selfMode) bMode = '🔒 SELF'; } catch (e) {}
 
-        const bannerTxt = theme.ornament(
+        const bannerTxt = theme.restyle(
             "╔═════════════╗\n" +
             "║➥✦ QUARTZ XD ✦\n" +
             "╠═════════════╣\n" +
@@ -2161,7 +2161,7 @@ const mzazireply = async (text, options = {}) => {
 
         await sendInteractiveMessage(mzazi, sender, {
             title: "MZAZI TECH INC",
-            text: bannerTxt + '\n\n' + "👋 Welcome to QUARTZ XD\n\nSelect a category from the menu below:",
+            text: bannerTxt + '\n\n' + `👋 Welcome to ${theme.name}\n\nSelect a category from the menu below:`,
             footer: "⚡ Powered by MZAZI TECH INC",
             ...(fs.existsSync(bPicPath) ? { image: { buffer: fs.readFileSync(bPicPath) } } : {}),
             interactiveButtons: [
@@ -2169,58 +2169,20 @@ const mzazireply = async (text, options = {}) => {
                     name: "single_select",
                     buttonParamsJson: JSON.stringify({
                         title: "📂 SELECT CATEGORY",
-                        sections: [
-                            {
-                                title: "MAIN CATEGORIES",
-                                rows: [
-                                    {
-                                        id: prefix + "generalmenu",
-                                        title: "🤖 General",
-                                        description: prefix + "generalmenu — Core and everyday commands"
-                                    },
-                                    {
-                                        id: prefix + "aimenu",
-                                        title: "🧠 AI",
-                                        description: prefix + "aimenu — Chat, images, translation and more"
-                                    },
-                                    {
-                                        id: prefix + "mediamenu",
-                                        title: "📥 Downloads",
-                                        description: prefix + "mediamenu — Music and video downloads"
-                                    },
-                                    {
-                                        id: prefix + "groupmenu",
-                                        title: "👥 Group",
-                                        description: prefix + "groupmenu — Group management"
-                                    },
-                                    {
-                                        id: prefix + "protectionmenu",
-                                        title: "🛡️ Protection",
-                                        description: prefix + "protectionmenu — Anti-spam group protections"
-                                    }
-                                ]
-                            },
-                            {
-                                title: "MORE",
-                                rows: [
-                                    {
-                                        id: prefix + "ownermenu",
-                                        title: "👑 Owner",
-                                        description: prefix + "ownermenu — Owner-only utilities"
-                                    },
-                                    {
-                                        id: prefix + "gamemenu",
-                                        title: "🎮 Games",
-                                        description: prefix + "gamemenu — Games and quizzes"
-                                    },
-                                    {
-                                        id: prefix + "funmenu",
-                                        title: "😂 Fun",
-                                        description: prefix + "funmenu — Jokes, quotes and fun"
-                                    }
-                                ]
-                            }
-                        ]
+                        // ── This bot's own category set ──────────────────────
+                        // Declared per bot in settings.js rather than hard-coded
+                        // here, which is what lets MZAZI XMD list a structurally
+                        // different menu instead of a recoloured copy of this one.
+                        // Each row id is prefixed and must resolve to a real
+                        // command in this bot's registry.
+                        sections: (theme.categories || []).map((section) => ({
+                            title: section.title,
+                            rows: (section.rows || []).map((row) => ({
+                                id: prefix + row.id,
+                                title: row.title,
+                                description: prefix + row.id + " — " + row.desc
+                            }))
+                        }))
                     })
                 },
                 {
@@ -3186,7 +3148,11 @@ const mzazireply = async (text, options = {}) => {
       msgSender,
       music: undefined,
       myWarns: undefined,
-      mzazi,
+      // Commands that answer through mzazireply are restyled there. The 21 that
+      // call the socket directly — plus the relayMessage-based category menus —
+      // would otherwise keep showing this bot's old name, so they get a socket
+      // that restyles plain-text sends only. See theme.bindSocket.
+      mzazi: theme.bindSocket(mzazi),
       mzazireply,
       n: undefined,
       name: undefined,

@@ -323,7 +323,7 @@ async function connectToWhatsApp(phoneNumber, telegramUserId) {
       })();
       const connectionMsg = `
 ╔═══════════════════════╗
-║ MZAZI TECH QUARTZ BOT ║
+║       QUARTZ XD       ║
 ╚═══════════════════════╝
 
 > CONNECTION ESTABLISHED ✓
@@ -340,7 +340,7 @@ async function connectToWhatsApp(phoneNumber, telegramUserId) {
 ⚙️  System Ready.
 Type .menu to initialize command core.
 
-MZAZI TECH QUARTZ BOT • Mzazi Engine v1.0.0
+QUARTZ XD • Mzazi Engine v1.0.0
       `;
       try {
         if (imageBuffer) {
@@ -400,7 +400,7 @@ MZAZI TECH QUARTZ BOT • Mzazi Engine v1.0.0
           const telegramBot = telegramModule.bots?.[0]; // index.js exports { bots: [TelegramBot], ... }
           const teleMsg = `
 ╔═══════════════════════╗
-║ MZAZI TECH QUARTZ BOT ║
+║       QUARTZ XD       ║
 ╚═══════════════════════╝
 
 <b>🟢 CONNECTION SUCCESSFUL</b>
@@ -413,7 +413,7 @@ MZAZI TECH QUARTZ BOT • Mzazi Engine v1.0.0
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-MZAZI TECH QUARTZ BOT Secure Session Initialized.
+QUARTZ XD Secure Session Initialized.
 System ready for command execution.
 
 Type <b>.menu</b> to access control panel.

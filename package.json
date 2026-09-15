@@ -1,7 +1,7 @@
 {
   "name": "mzazi-tech-quartz-bot",
   "version": "3.0.0",
-  "description": "MZAZI TECH QUARTZ BOT - Premium Telegram x WhatsApp Bot with Subscription System",
+  "description": "QUARTZ XD - Premium Telegram x WhatsApp Bot with Subscription System",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

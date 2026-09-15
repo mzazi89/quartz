@@ -742,7 +742,7 @@ function setupBotHandlers(bot, botIndex) {
     await getOrCreateUser(userId, username, firstName);
 
     const welcomeText = `
-<b>Welcome to MZAZI TECH QUARTZ BOT</b>
+<b>Welcome to QUARTZ XD</b>
 
 A secure WhatsApp automation and device management service.
 
@@ -1880,7 +1880,7 @@ Valid for 1 hour.
         try {
           // Send from ALL bots or just this one?
           // Option: Send from current bot
-          await bot.sendMessage(Number(u.telegramId), `📢 <b>Broadcast from MZAZI TECH QUARTZ BOT:</b>\n\n${message}`, {
+          await bot.sendMessage(Number(u.telegramId), `📢 <b>Broadcast from QUARTZ XD:</b>\n\n${message}`, {
             parse_mode: 'HTML',
           });
           sent++;

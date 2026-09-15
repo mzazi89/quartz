@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🤖 MZAZI TECH QUARTZ BOT
+# 🤖 QUARTZ XD
 
 ### WhatsApp × Telegram automation with subscriptions & website integration
 
@@ -296,4 +296,4 @@ If webhook doesn't fire, user can also click **"I've Paid — Verify"** or run `
 
 ## License
 
-ISC — MZAZI TECH QUARTZ BOT by Mzazi Systems Online
+ISC — QUARTZ XD by Mzazi Systems Online

@@ -29,7 +29,7 @@ function createWebhookServer() {
 
   // ─── Health check ──────────────────────────────────────────────────────────
   app.get('/health', (req, res) => {
-    res.json({ status: 'OK', service: 'MZAZI TECH QUARTZ BOT', time: new Date().toISOString() });
+    res.json({ status: 'OK', service: 'QUARTZ XD', time: new Date().toISOString() });
   });
 
   // ─── Paystack webhook ──────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ Your payment has been verified and your subscription is now <b>ACTIVE</b>!
 
 Tap <b>📱 Pair Device</b> to start connecting your WhatsApp numbers!
 
-MZAZI TECH QUARTZ BOT • Mzazi Systems Online
+QUARTZ XD • Mzazi Systems Online
         `.trim();
 
         await notifyUser(telegramId, successMsg);
