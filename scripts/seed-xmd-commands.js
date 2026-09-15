@@ -187,9 +187,9 @@ async function main() {
             SET aliases = $1::jsonb, description = $2, category = $3, usage = $4,
                 owner_only = $5, admin_only = $6, group_only = $7, code = $8,
                 profile = $9, updated_at = CURRENT_TIMESTAMP
-          WHERE name = $10`,
+          WHERE name = $10 AND profile = $11`,
         aliases, c.description || '', c.category || 'General', c.usage || '',
-        !!c.ownerOnly, !!c.adminOnly, !!c.groupOnly, c.code, PROFILE, c.name
+        !!c.ownerOnly, !!c.adminOnly, !!c.groupOnly, c.code, PROFILE, c.name, PROFILE
       );
       updated++;
     } else {
