@@ -23,6 +23,9 @@ const waPanel = require("./lib/waPanel.js"); // WhatsApp panel reseller flow (.p
 const { syncRemoteCommands, getRemoteCommand, listRemoteCommands, runRemoteCommand, getRemoteStatus } = require("./lib/remoteCommands.js");
 const { handleGroupLockEvent } = require("./lib/groupLock.js");
 const { getMzaziApiKey, getSetting } = require("./lib/settings");
+// This bot's visual identity — accent, badge, banner ornaments, card palette.
+// Values come from settings.js `theme`; see lib/theme.js.
+const theme = require("./lib/theme.js");
 const { db, saveDB } = require("./lib/database");
 const {
   PAIRING_COMMAND,
@@ -80,7 +83,8 @@ function _truncate(str, max) {
 
 function _drawAvatarFallback(ctx, cx, cy, radius, accent) {
   const grad = ctx.createRadialGradient(cx, cy - radius * 0.15, radius * 0.1, cx, cy, radius);
-  grad.addColorStop(0, "#1e2a1e"); grad.addColorStop(1, "#0a120a");
+  // Brand-tinted: a MZAZI XMD fallback avatar is blue-dark, a QUARTZ XD one green-dark.
+  grad.addColorStop(0, theme.background[1]); grad.addColorStop(1, theme.background[0]);
   ctx.fillStyle = grad; ctx.fill();
   ctx.globalAlpha = 0.65; ctx.fillStyle = accent;
   ctx.beginPath(); ctx.arc(cx, cy - radius * 0.18, radius * 0.36, 0, Math.PI * 2); ctx.fill();
@@ -109,12 +113,16 @@ async function _drawAvatar(ctx, cx, cy, radius, profilePicUrl, accent) {
   ctx.restore();
 }
 
+// The divider takes this bot's brand accent — the `accent` argument was accepted
+// here and then never used — and the badge is this bot's emoji signature. So a
+// card is identifiable as its own bot's even when the event palette is semantic
+// (gold for a promotion, red for a removal) instead of brand-coloured.
 function _drawBrandFooter(ctx, W, y, botName, accent) {
-  ctx.globalAlpha = 0.14; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.22; ctx.strokeStyle = accent || "#ffffff"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(120, y - 14); ctx.lineTo(W - 120, y - 14); ctx.stroke();
   ctx.globalAlpha = 1;
   ctx.font = "italic 13px Arial"; ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.textAlign = "center";
-  ctx.fillText(`🤖 ${botName}  •  Mzazi Tech Inc`, W / 2, y);
+  ctx.fillText(`🤖 ${botName} ${theme.badge}  •  Mzazi Tech Inc`, W / 2, y);
 }
 
 async function generateWelcomeImage({ memberNumber, groupName, memberCount, profilePicUrl }) {
@@ -122,11 +130,11 @@ async function generateWelcomeImage({ memberNumber, groupName, memberCount, prof
   const W = 800, H = 570;
   const canvas = _createCanvas(W, H);
   const ctx = canvas.getContext("2d");
-  const A = "#1fdb7e", A2 = "#00ffaa";
+  const A = theme.accent, A2 = theme.accent2;
   const botName = config.botName || "MZAZI TECH QUARTZ BOT";
 
   const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#051810"); bg.addColorStop(0.5, "#0c3820"); bg.addColorStop(1, "#051810");
+  bg.addColorStop(0, theme.background[0]); bg.addColorStop(0.5, theme.background[1]); bg.addColorStop(1, theme.background[2]);
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
   ctx.globalAlpha = 0.055; ctx.fillStyle = A;
@@ -154,7 +162,7 @@ async function generateWelcomeImage({ memberNumber, groupName, memberCount, prof
   const tg = ctx.createLinearGradient(180, 0, 620, 0);
   tg.addColorStop(0, A); tg.addColorStop(0.5, A2); tg.addColorStop(1, A);
   ctx.font = "bold 58px Arial"; ctx.fillStyle = tg; ctx.textAlign = "center";
-  ctx.shadowColor = "rgba(0,220,100,0.45)"; ctx.shadowBlur = 20;
+  ctx.shadowColor = theme.glow; ctx.shadowBlur = 20;
   ctx.fillText("🎉  WELCOME!", W / 2, 295); ctx.shadowBlur = 0;
 
   ctx.font = "bold 27px Arial"; ctx.fillStyle = "#ffffff";
@@ -261,7 +269,10 @@ async function generateEventImage({ memberNumber, eventType, groupName, details 
     promote:     { bg:["#120a28","#261650","#120a28"], A:"#f0c040", A2:"#ffd700", badge:"👑   PROMOTED TO ADMIN",    title:"PROMOTED!" },
     demote:      { bg:["#200e00","#3e1c00","#200e00"], A:"#ff8c42", A2:"#ffa760", badge:"📉   ADMIN RIGHTS REMOVED",  title:"DEMOTED"   },
     remove:      { bg:["#180000","#300000","#180000"], A:"#e94560", A2:"#ff6b8a", badge:"🚪   REMOVED FROM GROUP",    title:"REMOVED"   },
-    add:         { bg:["#051810","#0c3820","#051810"], A:"#1fdb7e", A2:"#00ffaa", badge:"✅   JOINED THE GROUP",      title:"JOINED!"   },
+    // "Joined" is the one event whose colour IS the brand colour rather than a
+    // semantic one (gold = promoted, red = removed). It therefore follows the
+    // bot's own accent: unchanged green on QUARTZ XD, electric blue on MZAZI XMD.
+    add:         { bg:[theme.background[0],theme.background[1],theme.background[2]], A:theme.accent, A2:theme.accent2, badge:"✅   JOINED THE GROUP",      title:"JOINED!"   },
     description: { bg:["#090f28","#10204a","#090f28"], A:"#5b9fff", A2:"#7eb8ff", badge:"📝   DESCRIPTION UPDATED",  title:"INFO UPDATE"},
     subject:     { bg:["#180e00","#2e1c00","#180e00"], A:"#ffcc44", A2:"#ffe066", badge:"✏️   GROUP RENAMED",         title:"RENAMED"   },
     default:     { bg:["#090f28","#101e3c","#090f28"], A:"#4a9fff", A2:"#73b4ff", badge:"📢   GROUP EVENT",           title:"UPDATE"    },
@@ -354,9 +365,9 @@ async function handleGroupParticipantsUpdate(mzazi, update) {
       try { profilePicUrl = await mzazi.profilePictureUrl(participantJid, "image"); } catch {}
 
       if (action === "add" && gs.welcome) {
-        const caption =
+        const caption = theme.ornament(
           `╔════════════════════╗\n║   🎉 *WELCOME* 🎉   ║\n╚════════════════════╝\n\n` +
-          `✨ @${memberNumber} just joined!\n\n📌 *Group:* ${groupName}\n👥 *Total Members:* ${memberCount}\n\n_We are so glad to have you here!_ 🌟`;
+          `✨ @${memberNumber} just joined!\n\n📌 *Group:* ${groupName}\n👥 *Total Members:* ${memberCount}\n\n_We are so glad to have you here!_ 🌟`);
         try {
           const img = await generateWelcomeImage({ memberNumber, groupName, memberCount, profilePicUrl });
           if (img) await mzazi.sendMessage(groupJid, { image: img, caption, mentions: [participantJid] });
@@ -365,9 +376,9 @@ async function handleGroupParticipantsUpdate(mzazi, update) {
       }
 
       else if (action === "remove" && gs.goodbye) {
-        const caption =
+        const caption = theme.ornament(
           `╔════════════════════╗\n║   🌙 *GOODBYE* 🌙   ║\n╚════════════════════╝\n\n` +
-          `💔 @${memberNumber} has left.\n\n📌 *Group:* ${groupName}\n\n_Thank you for being with us. Until we meet again..._ 🌠`;
+          `💔 @${memberNumber} has left.\n\n📌 *Group:* ${groupName}\n\n_Thank you for being with us. Until we meet again..._ 🌠`);
         try {
           const img = await generateGoodbyeImage({ memberNumber, groupName, profilePicUrl });
           if (img) await mzazi.sendMessage(groupJid, { image: img, caption, mentions: [participantJid] });
@@ -376,9 +387,9 @@ async function handleGroupParticipantsUpdate(mzazi, update) {
       }
 
       else if (action === "promote" && gs.events) {
-        const caption =
+        const caption = theme.ornament(
           `╔════════════════════╗\n║  👑 *PROMOTED!* 👑  ║\n╚════════════════════╝\n\n` +
-          `⭐ @${memberNumber} has been promoted!\n🎖️ *New Role:* Admin\n\n📌 *Group:* ${groupName}\n\n_Congratulations! 🎉_`;
+          `⭐ @${memberNumber} has been promoted!\n🎖️ *New Role:* Admin\n\n📌 *Group:* ${groupName}\n\n_Congratulations! 🎉_`);
         try {
           const img = await generateEventImage({ memberNumber, eventType: "promote", groupName, profilePicUrl });
           if (img) await mzazi.sendMessage(groupJid, { image: img, caption, mentions: [participantJid] });
@@ -387,9 +398,9 @@ async function handleGroupParticipantsUpdate(mzazi, update) {
       }
 
       else if (action === "demote" && gs.events) {
-        const caption =
+        const caption = theme.ornament(
           `╔════════════════════╗\n║  📉 *DEMOTED* 📉   ║\n╚════════════════════╝\n\n` +
-          `@${memberNumber} has been demoted.\n🔻 *Admin rights removed*\n\n📌 *Group:* ${groupName}`;
+          `@${memberNumber} has been demoted.\n🔻 *Admin rights removed*\n\n📌 *Group:* ${groupName}`);
         try {
           const img = await generateEventImage({ memberNumber, eventType: "demote", groupName, profilePicUrl });
           if (img) await mzazi.sendMessage(groupJid, { image: img, caption, mentions: [participantJid] });
@@ -413,7 +424,7 @@ async function handleGroupsUpdateEvent(mzazi, updates) {
       try { const meta = await mzazi.groupMetadata(groupJid); groupName = meta.subject || groupJid; } catch {}
 
       if (update.subject !== undefined) {
-        const caption = `╔════════════════════╗\n║  ✏️ *RENAMED* ✏️   ║\n╚════════════════════╝\n\n📌 Group name changed to:\n*${update.subject}*`;
+        const caption = theme.ornament(`╔════════════════════╗\n║  ✏️ *RENAMED* ✏️   ║\n╚════════════════════╝\n\n📌 Group name changed to:\n*${update.subject}*`);
         try {
           const img = await generateEventImage({ memberNumber: "", eventType: "subject", groupName: update.subject, details: `Was: ${groupName}` });
           if (img) await mzazi.sendMessage(groupJid, { image: img, caption });
@@ -422,7 +433,7 @@ async function handleGroupsUpdateEvent(mzazi, updates) {
       }
 
       if (update.desc !== undefined) {
-        const caption = `╔════════════════════╗\n║  📝 *INFO UPDATE* 📝║\n╚════════════════════╝\n\n📌 *Group:* ${groupName}\n\nNew description:\n_${_truncate(update.desc, 200)}_`;
+        const caption = theme.ornament(`╔════════════════════╗\n║  📝 *INFO UPDATE* 📝║\n╚════════════════════╝\n\n📌 *Group:* ${groupName}\n\nNew description:\n_${_truncate(update.desc, 200)}_`);
         try {
           const img = await generateEventImage({ memberNumber: "", eventType: "description", groupName, details: _truncate(update.desc, 60) });
           if (img) await mzazi.sendMessage(groupJid, { image: img, caption });
@@ -664,6 +675,10 @@ module.exports = async (mzazi, m) => {
 
       // Helper: send image with text fallback
       const _send3 = async (imgBuf, caption, mentions) => {
+        // This handler's banner styling, in one place: every caption below is
+        // routed through this bot's ornament set (MZAZI XMD draws rounded
+        // corners, QUARTZ XD keeps its double lines).
+        caption = theme.ornament(caption);
         try {
           if (imgBuf) {
             await mzazi.sendMessage(_stubGrp, { image: imgBuf, caption, mentions });
@@ -1809,8 +1824,8 @@ const mzazireply3 = async (caption, options = {}) => {
 };
 const mzazireply27 = async (text) => {
     return await sendButtonMessage(mzazi, sender, {
-        text,
-        footer: `© ${botName.toUpperCase()}`,
+        text: theme.ornament(text),
+        footer: theme.signatureUpper,
         buttons: [
             { id: ".menu", text: "📜 MENU" },
             { id: ".owner", text: "👑 OWNER" },
@@ -1821,13 +1836,23 @@ const mzazireply27 = async (text) => {
 
 const mzazireply = async (text, options = {}) => {
     try {
+        // ── This bot's own look ──────────────────────────────────────────────
+        // Every remote command replies through here, so the identity is applied
+        // in ONE place rather than in 1022 database-hosted command bodies: the
+        // banner ornaments are swapped for this bot's set (MZAZI XMD draws
+        // rounded corners, QUARTZ XD keeps its double lines) and the footer
+        // carries this bot's own name and badge.
+        text = theme.ornament(text);
+
         const {
             quoted = null,
             mentions = [],
             image = null,
             showMenu = false,
             customButtons = null,
-            footer = `© ${botName} | MAGGIE X KERUBO`
+            // The owner credit is appended below unless a caller set its own
+            // footer, so this stays this bot's identity line.
+            footer = theme.signature
         } = options;
 
         const chatId = sender;
@@ -2117,7 +2142,7 @@ const mzazireply = async (text, options = {}) => {
         let bMode = '🌐 PUBLIC';
         try { const _s = loadJSON(settingsPath, { selfMode: false }); if (_s.selfMode) bMode = '🔒 SELF'; } catch (e) {}
 
-        const bannerTxt =
+        const bannerTxt = theme.ornament(
             "╔═════════════╗\n" +
             "║➥✦ QUARTZ XD ✦\n" +
             "╠═════════════╣\n" +
@@ -2132,7 +2157,7 @@ const mzazireply = async (text, options = {}) => {
             "║➥│ 🔱 PREFIX  : " + prefix + "\n" +
             "║➥│ OWNER     : MZAZI TECH\n" +
             "║➥└──────────┘\n" +
-            "╚═════════════╝";
+            "╚═════════════╝");
 
         await sendInteractiveMessage(mzazi, sender, {
             title: "MZAZI TECH INC",

@@ -71,13 +71,30 @@ const staticConfig = {
     UNLIMITED: { name: "Unlimited",        maxDevices: 999, price: 250, days: 30 },
   },
 
+  // ─── Visual identity — see lib/theme.js ──────────────────────────────────────
+  // `accentColor` is the ONE value the whole look derives from: the badge emoji,
+  // the gradient partner, the card background, the glow, and the divider drawn on
+  // generated cards. It is read by lib/theme.js.
+  //
+  // It used to be declared here and read by NOTHING, while the image generators
+  // hard-coded their own greens — which is how QUARTZ XD and MZAZI XMD ended up
+  // rendering identical cards and identical banners.
+  //
+  // These are QUARTZ XD's SHIPPED values, written out rather than derived, so
+  // this bot renders exactly as it does today. The differentiation lives on the
+  // XMD side (electric blue + rounded banners); this bot's look is unchanged on
+  // purpose, so nobody already using it sees it change.
   theme: {
     name: "MZAZI TECH QUARTZ BOT",
     mode: "DARK",
     primaryColor: "#007BFF",
     secondaryColor: "#FFFFFF",
     backgroundColor: "#000000",
-    accentColor: "#00A2FF"
+    accentColor: "#1fdb7e",              // the green this bot already renders
+    accentColor2: "#00ffaa",             // gradient partner on generated cards
+    cardBg: ["#051810", "#0c3820", "#051810"],
+    badge: "🟢",                         // emoji signature on every reply footer
+    bannerStyle: "double"                // ╔══╗ — unchanged for this bot
   },
 
   fonts: {
