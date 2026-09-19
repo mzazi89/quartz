@@ -586,9 +586,13 @@ const setBotName = (phoneNum, name) => {
 // The display text of an interactive reply body.
 //
 // `body` is a MESSAGE in the protobuf — `Body { text }` — not a string. Reading it
-// as text throws, and because getBody is wrapped in a try/catch the throw turned
-// into an empty string, which read downstream as "the user sent nothing". That is
-// what made a menu tap in a group do nothing at all. Accept both shapes anyway:
+// as text throws, and because getBody is wrapped in a try/catch that returns "", the
+// throw became an empty string, which read downstream as "the user sent nothing".
+//
+// This was a real bug but NOT the cause of the group menu taps doing nothing: while
+// the type came from Object.keys(message)[0] the branch carrying this line was never
+// reached at all, so the throw could not even happen. It would have bitten as soon
+// as the type was fixed — the two had to be fixed together. Accept every shape:
 // what arrives is whatever the client built, not what the schema promised.
 const interactiveBodyText = (body) => {
   if (!body) return "";
@@ -598,9 +602,75 @@ const interactiveBodyText = (body) => {
   return "";
 };
 
-const getBody = (message, chatId) => {
-  if (!message) return "";
-  const type = Object.keys(message)[0];
+// ─── what kind of message is this? ───────────────────────────────────────────
+// NOT Object.keys(message)[0]. That is what this used to be, and it is wrong.
+//
+// A decoded message arrives with its fields in SCHEMA order, and MessageContextInfo
+// is field 35 while every content field is 39 or higher. So whenever the context
+// blob is present — and on an interactive reply it usually is — the first key names
+// that blob rather than the content. No branch below matched, getBody returned ""
+// and the message read as "the user said nothing": a tapped menu did nothing at
+// all, with nothing logged, in a way that looks exactly like a broken button.
+//
+// Proven against the shipped decoder rather than reasoned about: decoding a message
+// carrying both fields reports ['messageContextInfo', 'interactiveResponseMessage'],
+// in BOTH encode orders. (proto.Message.create happens to order them the other way
+// round, which is why a hand-built object passes a test the real thing fails.)
+//
+// A typed command in the same group was unaffected, because a plain text message
+// does not carry the context blob — which is why this only ever showed up on taps.
+const NON_CONTENT_FIELDS = new Set([
+  'messageContextInfo',            // field 35 — the one that caused all of this
+  'senderKeyDistributionMessage',  // field 2 in the sender's copy
+  'messageSecret',
+  'messageStubType',
+  'messageStubParameters',
+  'messageAddOnContextInfo',
+]);
+
+// Wrappers hold the real message one level down. They are containers, not content.
+const WRAPPER_FIELDS = [
+  'ephemeralMessage',
+  'viewOnceMessage',
+  'viewOnceMessageV2',
+  'viewOnceMessageV2Extension',
+  'documentWithCaptionMessage',
+];
+
+/** The innermost content of a message, stepping through any wrapper layers. */
+const unwrapMessage = (message) => {
+  let current = message;
+  for (let i = 0; i < 4 && current; i += 1) {
+    let next = null;
+    for (const k of WRAPPER_FIELDS) {
+      if (current[k] && current[k].message) { next = current[k].message; break; }
+    }
+    if (!next) break;
+    current = next;
+  }
+  return current || {};
+};
+
+/**
+ * The content field of a message — the first key that is not a context field.
+ *
+ * Reading it this way rather than from a fixed list means a content type this file
+ * has never heard of is still named correctly instead of silently ignored.
+ */
+const messageType = (message) => {
+  const inner = unwrapMessage(message);
+  for (const k of Object.keys(inner)) {
+    if (!NON_CONTENT_FIELDS.has(k)) return k;
+  }
+  return "";
+};
+
+const getBody = (rawMessage, chatId) => {
+  if (!rawMessage) return "";
+  // Everything below reads from the unwrapped content, so a message inside an
+  // ephemeral or view-once envelope behaves like the plain one it contains.
+  const message = unwrapMessage(rawMessage);
+  const type = messageType(message);
   try {
     if (type === "conversation") return message.conversation || "";
     if (type === "extendedTextMessage") return message.extendedTextMessage.text || "";
@@ -853,7 +923,9 @@ module.exports = async (mzazi, m) => {
     const sender = m.key.remoteJid;
     const body = getBody(m.message, sender).trim();
     const message = m.message;
-    const type = Object.keys(message)[0] || "";
+    // The content field, not the first key — see messageType(). The raw message is
+    // kept as-is here because the anti-delete path below needs its wrapper layers.
+    const type = messageType(message);
     const budy = getBody(message, sender);
     if (!sender || typeof sender !== "string") return;
 
