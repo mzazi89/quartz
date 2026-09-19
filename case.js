@@ -21,6 +21,9 @@ const { logSystem } = require('./helper/logger.js'); // Adjust path as needed
 const { logIncomingMessage, logGroupCommand } = require("./lib/chatLogger");
 const waPanel = require("./lib/waPanel.js"); // WhatsApp panel reseller flow (.panel/.unlimited)
 const { syncRemoteCommands, getRemoteCommand, listRemoteCommands, runRemoteCommand, getRemoteStatus } = require("./lib/remoteCommands.js");
+// Commands the engine handles itself, so they never appear in the imported registry
+// and getRemoteCommand() would not recognise them.
+const ENGINE_COMMANDS = ["synccmd", "sync", "remote"];
 const { handleGroupLockEvent } = require("./lib/groupLock.js");
 const { getMzaziApiKey, getSetting } = require("./lib/settings");
 // This bot's visual identity — accent, badge, banner ornaments, card palette.
@@ -1763,16 +1766,36 @@ You:`.trim();
     // ── WhatsApp PANEL reseller: capture plain-text replies to a pending
     //    "client details" prompt (must run before the chatbot so an AI reply
     //    can't swallow the client's username/phone).
-    if (!isGroup && waPanel.hasPending(sender)) {
-      if (isCmd) {
-        // A new command while an order is pending = new intent: drop the stale
-        // order, except .panel/.unlimited/.cancel which manage it themselves.
-        const c = command || "";
-        if (c !== "panel" && c !== "unlimited" && c !== "cancel") waPanel.clearPending(sender);
-      } else if (budy && budy.trim()) {
-        const consumed = await waPanel.handlePlainInput({ mzazi, sender, budy, senderPhone: await senderPhoneNumber(), prefix });
-        if (consumed) return;
-      }
+    // ── WhatsApp PANEL reseller: capture the reply to the pending "client details"
+    //    prompt (must run before the chatbot so an AI reply can't swallow the
+    //    client's username and phone).
+    //
+    // This used to run only when the message was NOT a command (`else if (!isCmd)`).
+    // With no prefix configured EVERY message counts as a command, so that branch
+    // was unreachable: the details were dispatched as an unknown command, the
+    // pending order was dropped, and the bot answered nothing at all. That silence —
+    // not the earlier activation failures — is what "it doesn't work after sending
+    // the client details" was.
+    //
+    // The pending prompt now gets first refusal on the next message. It only keeps
+    // it when the text really is the client's details; a genuine command still wins,
+    // and neither-details-nor-command keeps the order open so a typo can be fixed.
+    if (!isGroup && waPanel.hasPending(sender) && budy && budy.trim()) {
+      const c = command || "";
+      const consumed = await waPanel.handlePlainInput({
+        mzazi,
+        sender,
+        budy,
+        senderPhone: await senderPhoneNumber(),
+        prefix,
+        // Only the caller can tell a real command from ordinary text, because with no
+        // prefix configured there is nothing to tell them apart by.
+        isKnownCommand: ENGINE_COMMANDS.includes(c) || Boolean(c && getRemoteCommand(c)),
+        // .panel / .unlimited / .cancel manage the pending order themselves, so they
+        // are never treated as the client's details.
+        isPanelCommand: c === "panel" || c === "unlimited" || c === "cancel",
+      });
+      if (consumed) return;
     }
 
     await handleChatbotResponse();
