@@ -1819,9 +1819,9 @@ You:`.trim();
         // Only the caller can tell a real command from ordinary text, because with no
         // prefix configured there is nothing to tell them apart by.
         isKnownCommand: ENGINE_COMMANDS.includes(c) || Boolean(c && getRemoteCommand(c)),
-        // .panel / .unlimited / .cancel manage the pending order themselves, so they
-        // are never treated as the client's details.
-        isPanelCommand: c === "panel" || c === "unlimited" || c === "cancel",
+        // .panel / .unlimited / .cancel and every size command manage the pending
+        // order themselves, so they are never treated as the client's details.
+        isPanelCommand: waPanel.isPanelCommand(c),
         // Our own message, come back around. Consumed without a reply.
         isOwnMessage: ownSentIds.has(m.key?.id),
       });
