@@ -1256,6 +1256,39 @@ module.exports = async (mzazi, m) => {
       return jid;
     };
 
+    // ─── The sender's REAL phone number ──────────────────────────────────────
+    // WhatsApp increasingly addresses a chat by Linked ID (@lid), and a LID's
+    // numeric part is NOT a phone number. `senderNumber` is only the digits of the
+    // jid, so on such a chat it is a number no panel could ever accept — which is
+    // why a reseller was told "I can't use this number" no matter what they typed,
+    // and why that message could never name a usable number.
+    //
+    // Baileys carries the other addressing form beside the jid it chose:
+    // `remoteJidAlt` for a DM, `participantAlt` in a group — and prefers them the
+    // same way in its own code. Whichever form is missing falls back to the LID→PN
+    // mapping, and only then to `senderNumber` exactly as before, so a chat where
+    // none of this applies behaves identically to today.
+    const senderPhoneNumber = async () => {
+      const candidates = (isGroup
+        ? [m.key?.participantAlt, msgSender]
+        : [m.key?.remoteJidAlt, msgSender]
+      ).filter(Boolean);
+
+      // Prefer a candidate that is already a phone-number jid.
+      for (const c of candidates) {
+        if (String(c).endsWith("@s.whatsapp.net")) {
+          const digits = normalizeJid(c);
+          if (digits) return digits;
+        }
+      }
+      // Otherwise resolve the LID form, then fall back untouched.
+      for (const c of candidates) {
+        const digits = normalizeJid(await resolveJid(c));
+        if (digits) return digits;
+      }
+      return senderNumber;
+    };
+
     // ========== MODE SETTINGS (self / public) ==========
     
     let currentSettings = loadJSON(settingsPath, { publicMode: true, selfMode: false });
@@ -1737,7 +1770,7 @@ You:`.trim();
         const c = command || "";
         if (c !== "panel" && c !== "unlimited" && c !== "cancel") waPanel.clearPending(sender);
       } else if (budy && budy.trim()) {
-        const consumed = await waPanel.handlePlainInput({ mzazi, sender, budy, senderPhone: senderNumber, prefix });
+        const consumed = await waPanel.handlePlainInput({ mzazi, sender, budy, senderPhone: await senderPhoneNumber(), prefix });
         if (consumed) return;
       }
     }
@@ -2540,7 +2573,7 @@ const mzazireply = async (text, options = {}) => {
         command,
         args,
         prefix,
-        senderPhone: senderNumber,
+        senderPhone: await senderPhoneNumber(),
       });
       if (panelHandled) return;
     }
