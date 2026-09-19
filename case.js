@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const ffmpeg = require("fluent-ffmpeg");
 const { PassThrough } = require("stream");
 const baileys = require("@whiskeysockets/baileys");
-const { sendButtons, sendInteractiveMessage } = require("gifted-btns");
+const { sendButtons, sendInteractiveMessage } = require("./lib/interactive");
 const { exec } = require("child_process");
 const fetch = global.fetch || require("node-fetch");
 const profiles = require("./lib/profiles");
@@ -44,6 +44,9 @@ const { downloadMediaMessage, generateWAMessageFromContent, proto, prepareWAMess
 
 const pino = require("pino");
 const { sendButtonMessage } = require("./lib/buttons");
+// Menus index their rows when they are sent, so a tap that comes back without its
+// id — which is what happens in a group — can still be traced to a command.
+const interactiveRows = require("./lib/interactiveRows");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CANVAS — GROUP EVENT IMAGE GENERATOR
@@ -580,7 +583,22 @@ const setBotName = (phoneNum, name) => {
   saveJSON(p, s);
 };
 
-const getBody = (message) => {
+// The display text of an interactive reply body.
+//
+// `body` is a MESSAGE in the protobuf — `Body { text }` — not a string. Reading it
+// as text throws, and because getBody is wrapped in a try/catch the throw turned
+// into an empty string, which read downstream as "the user sent nothing". That is
+// what made a menu tap in a group do nothing at all. Accept both shapes anyway:
+// what arrives is whatever the client built, not what the schema promised.
+const interactiveBodyText = (body) => {
+  if (!body) return "";
+  if (typeof body === "string") return body;
+  if (typeof body.text === "string") return body.text;
+  if (body.text && typeof body.text.text === "string") return body.text.text;
+  return "";
+};
+
+const getBody = (message, chatId) => {
   if (!message) return "";
   const type = Object.keys(message)[0];
   try {
@@ -595,23 +613,36 @@ const getBody = (message) => {
       if (rowId) return rowId;
       const lBody = message.listResponseMessage?.title || "";
       const lm = lBody.match(/(^|\n)\s*([.#!][\w]+)/);
-      return lm ? lm[2] : lBody;
+      if (lm) return lm[2];
+      // A label with no command in it — see the note on interactiveResponseMessage.
+      const lid = interactiveRows.resolve(chatId, lBody);
+      if (lid) return lid;
+      return lBody;
     }
     if (type === "interactiveResponseMessage") {
-      const ir = message.interactiveResponseMessage;
-      if (ir.nativeFlowResponseMessage?.paramsJson) {
+      const ir = message.interactiveResponseMessage || {};
+
+      // 1. The id we built the row with. A private chat sends this back, which is
+      //    why the same menu works in a DM and not in a group.
+      const pj = ir.nativeFlowResponseMessage?.paramsJson;
+      if (pj) {
         try {
-          const id = JSON.parse(ir.nativeFlowResponseMessage.paramsJson).id;
+          const parsed = JSON.parse(pj);
+          const id = parsed.id || parsed.selectedId || parsed.selected_id || parsed.button_id || parsed.rowId;
           if (id) return id;
         } catch (e) {}
       }
-      // Group fallback: WhatsApp may deliver only the echoed body (row title +
-      // description) without paramsJson — recover the id from the description,
-      // which every menu row now starts with (e.g. ".subprotect — Anti-spam…").
-      if (ir.body) {
-        const m2 = ir.body.match(/(^|\n)\s*([.#!][\w]+)/);
+
+      // 2. What the group leaves behind: the row's label as the user read it.
+      const echoed = interactiveBodyText(ir.body);
+      if (echoed) {
+        const m2 = echoed.match(/(^|\n)\s*([.#!][\w]+)/);
         if (m2) return m2[2];
-        return ir.body;
+        // 3. And a label with no command in it at all ("🤖 AI MENU"): the row was
+        //    indexed when the menu was sent, so the id is recoverable by its label.
+        const rid = interactiveRows.resolve(chatId, echoed);
+        if (rid) return rid;
+        return echoed;
       }
       return "";
     }
@@ -816,11 +847,14 @@ module.exports = async (mzazi, m) => {
     // ── End group event stubs ─────────────────────────────────────────────────
 
     if (!m.message) return;
-    const body = getBody(m.message).trim();
+    // The chat id goes in because a button tap in a group can come back without the
+    // id the row was built with, and the row is then looked up by its label among
+    // the menus that were sent to this chat.
+    const sender = m.key.remoteJid;
+    const body = getBody(m.message, sender).trim();
     const message = m.message;
     const type = Object.keys(message)[0] || "";
-    const budy = getBody(message);
-    const sender = m.key.remoteJid;
+    const budy = getBody(message, sender);
     if (!sender || typeof sender !== "string") return;
 
     // ── ANTI-DELETE: detect revoke protocol messages ─────────────────────
