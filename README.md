@@ -219,6 +219,45 @@ out; the website reads only the bots it is configured with, so it is ignored.
 
 ---
 
+## Buttons and pictures on replies
+
+Every button message this bot sends is also a picture message. That is done in the
+send layer, not in the command bodies, because there are ~2000 of them and the two
+things that decide it are the same for all of them:
+
+| Path | What it covers |
+|---|---|
+| `lib/buttons.js` → `sendButtonMessage` | every `mzazireply` reply — the path ~82% of the pack takes |
+| `lib/interactive.js` → `sendInteractiveMessage` | every menu, and every body that sends one directly |
+| `lib/interactive.js` → `sendButtons` | the legacy shape, which is exposed to command bodies |
+| `lib/botTelemetry.js` | admin broadcasts, which used to go out as bare text |
+
+`lib/replyImage.js` supplies the picture, in this order:
+
+1. the session's own `database/sessions/<bot>/menu.jpg`
+2. the pack's `media/menu.jpg`
+3. a canvas-rendered branded card, if `canvas` is installed
+
+Whichever source wins is re-encoded to a 1000px JPEG q72 and cached against the
+file's mtime — `media/menu.jpg` is a 2.6 MB photograph, and uploading that on every
+reply would make the bot slower for no visible gain. Without `canvas` a file over
+400 KB is skipped rather than uploaded as-is.
+
+Properties that make it safe to attach a picture to every reply, each covered by
+`npm run test:buttons`:
+
+- an image the caller chose is never replaced
+- a payload with no buttons is never given a picture
+- a payload that cannot get a picture is returned unchanged, and still sent
+- the whole thing can be switched off: `reply_images` in the admin `settings`
+  table, or `REPLY_IMAGES=0` in the environment
+
+There is one gap, stated rather than hidden: 436 of the pack's bodies send media
+through `mzazi.sendMessage` directly, and a WhatsApp button cannot ride in a media
+bubble. Those keep their picture and gain no button.
+
+---
+
 ## Architecture
 
 ```
@@ -233,6 +272,9 @@ lib/
   botDb.js            ← Shared Neon client + the bot_control/bot_status DDL
   botTelemetry.js     ← Per-bot heartbeat, control queue, registry watcher
   remoteCommands.js   ← Command registry from the website, scoped per bot
+  replyImage.js       ← The picture attached to every button message — NEW
+  buttons.js          ← Native button messages (now always with the picture)
+  interactive.js      ← Menus: row indexing + the picture
   subscription.js     ← Subscription logic — NEW
   payment.js          ← Paystack integration — NEW
   admin.js            ← Admin panel functions — NEW

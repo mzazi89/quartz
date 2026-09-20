@@ -1212,7 +1212,10 @@ module.exports = async (mzazi, m) => {
       isOwner;
 
     const botName = getBotName(botPhoneNum);
-    const reply = async (txt) => mzazi.sendMessage(sender, { text: txt });
+    // The plain reply, which is handed to every command body in the registry
+    // context. Routed through mzazireply so that a body calling it is not the one
+    // kind of reply that arrives with no buttons and no picture of its own.
+    const reply = async (txt) => mzazireply(txt);
 
     // ==================== GROUP METADATA ====================
     // Hoisted so groupAdmins and participants are available everywhere below
@@ -1642,7 +1645,11 @@ You:`.trim();
         userInfo: chatMemory.userInfo.get(msgSender)
       });
 
-      await mzazi.sendMessage(sender, { text: response || "Hmm, I am having trouble replying right now." });
+      // Through mzazireply, so an AI answer is not the one kind of bot reply that
+      // arrives without buttons: it is the bot talking to a person, and the Menu
+      // button belongs under it exactly as it does under a command's output. It
+      // also brings the picture (lib/replyImage.js).
+      await mzazireply(response || "Hmm, I am having trouble replying right now.");
     }
 
     await handleAutoTyping();
@@ -3954,7 +3961,9 @@ const mzazireply = async (text, options = {}) => {
   } catch (error) {
     logger.error('WhatsApp message handler error:', error);
     try {
-      await mzazi.sendMessage(sender, { text: '❌ An error occurred while processing your command.' });
+      // The last thing a person sees after a failure should offer the way forward
+      // rather than a dead end — hence the house reply, with its buttons.
+      await mzazireply('❌ An error occurred while processing your command.');
     } catch (e) {}
   }
 };

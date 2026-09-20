@@ -13,7 +13,8 @@
     "db:studio": "npx prisma studio",
     "seed:xmd": "node scripts/seed-xmd-commands.js",
     "seed:xmd:apply": "node scripts/seed-xmd-commands.js --apply",
-    "postinstall": "npx prisma generate"
+    "postinstall": "npx prisma generate",
+    "test:buttons": "node scripts/test-buttons.js"
   },
   "overrides": {
     "form-data": "^4.0.0"
