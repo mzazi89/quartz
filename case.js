@@ -26,29 +26,12 @@ const { syncRemoteCommands, getRemoteCommand, listRemoteCommands, runRemoteComma
 const ENGINE_COMMANDS = ["synccmd", "sync", "remote"];
 
 // ── Messages THIS bot sent ───────────────────────────────────────────────────
-// In a self-chat ("Message yourself") EVERY message is `fromMe` — the owner's and
-// the bot's own — so `fromMe` cannot tell them apart. With no record of what we
-// sent, the bot reads its own reply back as if the owner had typed it. That is
-// lethal while an order is open, because the reply is not a client's details and
-// the order deliberately STAYS open, so each complaint provokes the next, forever.
-const ownSentIds = new Set();
-function rememberOwnSend(id) {
-  if (!id) return;
-  ownSentIds.add(id);
-  if (ownSentIds.size > 500) ownSentIds.delete(ownSentIds.values().next().value);
-}
-// Wrap the socket once so every send from any feature is recorded, not just the
-// panel's — the panel is not the only thing that talks in this chat.
-function trackOwnSends(sock) {
-  if (!sock || sock.__mzaziTracksOwnSends || typeof sock.sendMessage !== "function") return;
-  const base = sock.sendMessage.bind(sock);
-  sock.sendMessage = async (...args) => {
-    const sent = await base(...args);
-    try { rememberOwnSend(sent?.key?.id); } catch {}
-    return sent;
-  };
-  sock.__mzaziTracksOwnSends = true;
-}
+// Recorded so the bot never reads its own reply back as input. In a self-chat every
+// message is `fromMe`, so `fromMe` cannot separate the owner's from ours. Recording
+// the message ID alone was NOT enough — the echo did not always carry the id
+// sendMessage returned, and the spam carried on — so the TEXT is recorded too. See
+// lib/ownMessages.js.
+const ownMessages = require("./lib/ownMessages");
 const { handleGroupLockEvent } = require("./lib/groupLock.js");
 const { getMzaziApiKey, getSetting } = require("./lib/settings");
 // This bot's visual identity — accent, badge, banner ornaments, card palette.
@@ -1110,7 +1093,7 @@ module.exports = async (mzazi, m) => {
     const isGroup = sender.endsWith("@g.us");
 
     // Record what this bot sends, so its own replies are never read as input.
-    trackOwnSends(mzazi);
+    ownMessages.wrapSocket(mzazi);
 
     // In a group the real sender is m.key.participant; in DMs it's the remoteJid itself
     const msgSender = isGroup ? (m.key.participant || sender) : sender;
@@ -1823,7 +1806,7 @@ You:`.trim();
         // order themselves, so they are never treated as the client's details.
         isPanelCommand: waPanel.isPanelCommand(c),
         // Our own message, come back around. Consumed without a reply.
-        isOwnMessage: ownSentIds.has(m.key?.id),
+        isOwnMessage: ownMessages.isOwnEcho(m.key?.id, budy),
       });
       if (consumed) return;
     }
